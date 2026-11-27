@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=3">
+<link rel="stylesheet" href="app.css?v=4">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -36,6 +36,10 @@
   <symbol id="i-l" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></symbol>
   <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5h.01"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+  <symbol id="i-img" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M20 4L3 11l7 3 3 7z"/><path d="M10 14l10-10"/></symbol>
   <symbol id="i-sheet" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 10h16M4 15h16M10 4v16"/></symbol>
 </defs></svg>
 
@@ -49,6 +53,8 @@
     <a href="#home" data-nav="home"><svg class="ic"><use href="#i-home"/></svg>סקירה</a>
     <a href="#tx" data-nav="tx"><svg class="ic"><use href="#i-list"/></svg>תנועות</a>
     <a href="#budget" data-nav="budget"><svg class="ic"><use href="#i-pie"/></svg>תקציב ויעד חיסכון</a>
+    <a href="#msgs" data-nav="msgs"><svg class="ic"><use href="#i-chat"/></svg>הודעות<span class="cnt" data-unread hidden></span></a>
+    <a href="#album" data-nav="album"><svg class="ic"><use href="#i-img"/></svg>תמונות ושומר מסך</a>
     <hr>
     <a href="#import" data-nav="import"><svg class="ic"><use href="#i-import"/></svg>ייבוא מאקסל ושיטס</a>
     <a href="#sync" data-nav="sync"><svg class="ic"><use href="#i-sync"/></svg>סנכרון משותף<span class="mbadge" id="mSync"></span></a>
@@ -74,6 +80,7 @@
 
   <section class="view" data-view="home">
     <div class="hero"><div class="in">
+      <a class="hname" id="hName" href="#profile"></a>
       <p class="big" id="big"></p>
       <p class="sub" id="sub"></p>
       <div class="figs" id="figs"></div>
@@ -85,6 +92,8 @@
     </div></div>
     <div class="pad grid2">
       <div class="note span2" id="noteHome" hidden><span>אלה נתוני דוגמה כדי לראות איך זה עובד. אפשר לערוך אותם או להתחיל מאפס.</span><button class="btn sm" data-act="fresh">התחל טבלה ריקה</button></div>
+      <div class="card msgcard" id="homeMsg" hidden></div>
+      <div class="card albumcard" id="homeAlbum" hidden></div>
       <div class="card" id="alerts">
         <div class="ch"><h2>התראות</h2><a href="#budget" class="lnk">הגדרות</a></div>
         <ul class="al" id="alList"></ul>
@@ -188,6 +197,39 @@
     <div class="pad stack" id="syncBody"></div>
   </section>
 
+  <section class="view" data-view="msgs" hidden>
+    <div class="pad chatpad">
+      <div class="note" id="msgUpd" hidden></div>
+      <div id="chat" class="chat" aria-live="polite"></div>
+    </div>
+    <form class="composer" id="msgF">
+      <input class="field" id="meIn" maxlength="40" placeholder="איך קוראים לך?" aria-label="השם שלך" hidden>
+      <div class="crow"><textarea class="field" id="msgIn" rows="1" maxlength="2000" placeholder="כתוב הודעה…" aria-label="הודעה"></textarea><button class="send" type="submit" aria-label="שליחה"><svg class="ic"><use href="#i-send"/></svg></button></div>
+    </form>
+  </section>
+
+  <section class="view" data-view="album" hidden>
+    <div class="pad stack">
+      <div class="note" id="albUpd" hidden></div>
+      <div class="card">
+        <div class="ch"><h2>התמונות שלנו</h2><span class="hint" style="margin:0" id="albCount"></span></div>
+        <p class="hint">תמונות שמתחלפות כמו שומר מסך. כשהסנכרון פעיל הן עוברות לכל מי שמחובר לחשבון.</p>
+        <div class="btnrow" style="margin:0 0 14px"><button class="btn solid" id="albAdd"><svg class="ic"><use href="#i-plus"/></svg>הוסף תמונות</button><button class="btn green" data-act="ss"><svg class="ic"><use href="#i-play"/></svg>הפעל שומר מסך</button></div>
+        <input type="file" id="albFile" accept="image/*" multiple hidden>
+        <div class="agrid" id="agrid"></div>
+      </div>
+      <div class="card">
+        <h2>הגדרות שומר מסך</h2>
+        <div class="gset">
+          <label>החלפת תמונה כל<select class="field" id="ssInt"><option value="5">5 שניות</option><option value="8">8 שניות</option><option value="15">15 שניות</option><option value="30">30 שניות</option><option value="60">דקה</option></select></label>
+          <label>הפעלה אוטומטית כשלא נוגעים<select class="field" id="ssIdle"><option value="0">כבוי</option><option value="1">אחרי דקה</option><option value="2">אחרי 2 דקות</option><option value="5">אחרי 5 דקות</option></select></label>
+        </div>
+        <label class="chk"><input type="checkbox" id="ssInfo">להציג גם שעה ויתרה חודשית</label>
+        <p class="hint">בזמן ששומר המסך פועל המסך נשאר דלוק. ההגדרות האלה שמורות רק במכשיר הזה, כך שאפשר למשל להשאיר טאבלט על השיש עם הפעלה אוטומטית.</p>
+      </div>
+    </div>
+  </section>
+
   <section class="view" data-view="backup" hidden>
     <div class="pad grid2">
       <div class="card">
@@ -213,9 +255,12 @@
           <div class="btnrow" style="margin:0"><button class="btn sm" id="pPhoto">בחר תמונה</button><button class="btn sm danger" id="pPhotoDel" hidden>הסר</button></div>
         </div>
         <input type="file" id="pFile" accept="image/*" hidden>
-        <label class="lbl" for="pName">שם החשבון, למשל "הבית של נועה ואנוש"</label>
-        <input class="field" id="pName" maxlength="40" placeholder="הכסף שלי">
-        <p class="hint" style="margin-top:8px">השם עובר לכל מי שמחובר לאותו גיליון. התמונה נשמרת רק במכשיר הזה.</p>
+        <label class="lbl" for="pName">שם החשבון, במקום "הכסף שלי"</label>
+        <input class="field" id="pName" maxlength="40" placeholder="למשל: טליה ואלעד">
+        <p class="hint" style="margin-top:8px">מופיע בראש האפליקציה, בתפריט ובשומר המסך, ועובר לכל מי שמחובר לחשבון.</p>
+        <label class="lbl" for="pMe" style="margin-top:14px;display:block">השם שלי במכשיר הזה</label>
+        <input class="field" id="pMe" maxlength="40" placeholder="למשל: טליה">
+        <p class="hint" style="margin-top:8px">מופיע ליד ההודעות והתמונות שאתה מוסיף. תמונת הפרופיל נשמרת רק במכשיר הזה.</p>
       </div>
       <div class="card">
         <h2>התקנה כאפליקציה</h2>
@@ -239,7 +284,7 @@
   <a href="#home" data-nav="home"><svg class="ic"><use href="#i-home"/></svg><span>סקירה</span></a>
   <a href="#tx" data-nav="tx"><svg class="ic"><use href="#i-list"/></svg><span>תנועות</span></a>
   <span aria-hidden="true"></span>
-  <a href="#budget" data-nav="budget"><svg class="ic"><use href="#i-pie"/></svg><span>תקציב</span></a>
+  <a href="#msgs" data-nav="msgs" class="tmsg"><svg class="ic"><use href="#i-chat"/></svg><span>הודעות</span><b class="cnt" data-unread hidden></b></a>
   <button id="moreBtn" aria-label="תפריט נוסף"><svg class="ic"><use href="#i-menu"/></svg><span>עוד</span></button>
 </nav>
 <button class="fab" id="fab" aria-label="הוספה" aria-expanded="false" aria-controls="speed"><svg class="ic"><use href="#i-plus"/></svg></button>
@@ -311,8 +356,20 @@
   <div class="df"><button class="btn" type="button" data-close>סגור</button></div>
 </dialog>
 
+<dialog id="dPic" class="viewer">
+  <div class="dh"><small id="picBy"></small><button type="button" class="icon" data-close aria-label="סגירה"><svg class="ic"><use href="#i-x"/></svg></button></div>
+  <img id="picImg" alt="">
+  <div class="db picdb"><input class="field" id="picCap" maxlength="200" placeholder="כיתוב לתמונה" aria-label="כיתוב"><div class="btnrow" style="margin:0"><button class="btn green sm" id="picSave">שמור כיתוב</button><button class="btn danger sm" id="picDel">מחק תמונה</button></div></div>
+</dialog>
+
+<div class="ss" id="ss" hidden role="dialog" aria-label="שומר מסך. נגיעה סוגרת">
+  <div class="ssimg" id="ssA"></div><div class="ssimg" id="ssB"></div>
+  <div class="ssshade"></div>
+  <div class="sscap"><div><b id="ssName"></b><span id="ssText"></span></div><div class="ssinfo" id="ssInfoBox"><b id="ssClock"></b><span id="ssDate"></span><small id="ssLine"></small></div></div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

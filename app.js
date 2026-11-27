@@ -33,7 +33,7 @@ const DEF=()=>[
   {id:'i1',k:'inc',name:'משכורת',color:'#00a862',sal:true},
   {id:'i2',k:'inc',name:'עבודות צד',color:'#12a5b8'},
   {id:'i3',k:'inc',name:'הכנסה אחרת',color:'#6b7f2a'}];
-const blank=()=>({cats:DEF().map(normCat),tx:[],goal:2000,alertPct:80,su:0,profile:{name:''}});
+const blank=()=>({cats:DEF().map(normCat),tx:[],items:[],goal:2000,alertPct:80,su:0,profile:{name:''}});
 function sampleData(){
   let s=20261127;const r=()=>(s=s*16807%2147483647)/2147483647;const tx=[];
   for(let k=5;k>=0;k--){
@@ -56,10 +56,12 @@ function sampleData(){
 }
 function normCat(c){if(!c||typeof c!=='object')return null;return {id:String(c.id||rid()),k:c.k==='inc'?'inc':'exp',name:String(c.name||'ללא שם').slice(0,40),color:HEX.test(c.color||'')?c.color:'#64748b',pct:clamp(Math.round(+c.pct||0),0,100),sal:!!c.sal,sav:!!c.sav}}
 function normTx(t){if(!t||!YMD.test(t.d))return null;const o={id:String(t.id||rid()),d:t.d,t:t.t==='inc'?'inc':'exp',a:Math.round(Math.abs(+t.a||0)*100)/100,c:String(t.c||''),n:String(t.n||'').slice(0,200),img:String(t.img||''),u:+t.u||0};if(t.del)o.del=1;return o}
+function normItem(it){if(!it||(it.k!=='msg'&&it.k!=='pic'))return null;const id=String(it.id||'').replace(/[^a-z0-9]/gi,'').slice(0,40);if(!id)return null;const o={id,k:it.k,u:+it.u||0,by:String(it.by||'').slice(0,40),dv:String(it.dv||'').replace(/[^a-z0-9]/gi,'').slice(0,20),ts:+it.ts||0,text:String(it.text||'').slice(0,2000),img:String(it.img||'').replace(/[^a-z0-9]/gi,'').slice(0,40)};if(it.del)o.del=1;return o}
 function norm(d){
   const o=blank();if(!d||typeof d!=='object')return o;
   if(Array.isArray(d.cats)){const cs=d.cats.map(normCat).filter(Boolean);if(cs.some(c=>c.k==='exp')&&cs.some(c=>c.k==='inc'))o.cats=cs}
   if(Array.isArray(d.tx))o.tx=d.tx.map(normTx).filter(Boolean);
+  if(Array.isArray(d.items))o.items=d.items.map(normItem).filter(Boolean);
   o.goal=d.goal===undefined?2000:Math.max(0,+d.goal||0);
   o.alertPct=clamp(+d.alertPct||80,50,100);
   o.su=+d.su||0;o.profile={name:String(d.profile?.name||'').slice(0,40)};
@@ -69,25 +71,28 @@ function norm(d){
 /* ---------- state ---------- */
 const LS='kesef-li-v1',LSY='kesef-sync-v1',LSU='kesef-ui-v1';
 let S=blank(),sample=false,hist=[];
-let SY={on:false,url:'',key:'',since:0,dirty:[],cfgDirty:false,last:0,err:'',sheet:''};
+let SY={on:false,url:'',key:'',since:0,dirty:[],idirty:[],cfgDirty:false,last:0,err:'',sheet:'',sv:0};
 const wide=matchMedia('(min-width:900px)').matches;
-const ui={view:'home',cur:nowYm,scope:'month',typeF:'all',catF:'',q:'',sortK:'d',sortD:-1,mode:wide?'grid':'list'};
+const ui={view:'home',cur:nowYm,scope:'month',typeF:'all',catF:'',q:'',sortK:'d',sortD:-1,mode:wide?'grid':'list',me:'',dev:'',read:0,ss:{int:8,idle:0,info:true}};
 function load(){
   let raw=null;try{raw=localStorage.getItem(LS)}catch{}
   if(raw){try{S=norm(JSON.parse(raw));sample=false}catch{S=norm(sampleData());sample=true}}else{S=norm(sampleData());sample=true}
-  try{const y=JSON.parse(localStorage.getItem(LSY)||'null');if(y&&typeof y==='object')SY={...SY,...y,dirty:Array.isArray(y.dirty)?y.dirty:[]}}catch{}
-  try{const u=JSON.parse(localStorage.getItem(LSU)||'null');if(u&&(u.mode==='list'||u.mode==='grid'))ui.mode=u.mode}catch{}
+  try{const y=JSON.parse(localStorage.getItem(LSY)||'null');if(y&&typeof y==='object')SY={...SY,...y,dirty:Array.isArray(y.dirty)?y.dirty:[],idirty:Array.isArray(y.idirty)?y.idirty:[]}}catch{}
+  try{const u=JSON.parse(localStorage.getItem(LSU)||'null');if(u){if(u.mode==='list'||u.mode==='grid')ui.mode=u.mode;ui.me=String(u.me||'').slice(0,40);ui.dev=String(u.dev||'');ui.read=+u.read||0;if(u.ss)ui.ss={int:clamp(+u.ss.int||8,3,120),idle:clamp(+u.ss.idle||0,0,60),info:u.ss.info!==false}}}catch{}
+  if(!/^[a-z0-9]{8,}$/.test(ui.dev))ui.dev=rid(10);
 }
 let saveT=null,storageOk=true;
 function persist(){clearTimeout(saveT);saveT=setTimeout(persistNow,150)}
 function persistNow(){
-  try{if(!sample)localStorage.setItem(LS,JSON.stringify(S));localStorage.setItem(LSY,JSON.stringify(SY));localStorage.setItem(LSU,JSON.stringify({mode:ui.mode}));storageOk=true}
+  try{if(!sample)localStorage.setItem(LS,JSON.stringify(S));localStorage.setItem(LSY,JSON.stringify(SY));localStorage.setItem(LSU,JSON.stringify({mode:ui.mode,me:ui.me,dev:ui.dev,read:ui.read,ss:ui.ss}));storageOk=true}
   catch{storageOk=false}
   chrome();
 }
 window.addEventListener('pagehide',persistNow);
 
 const TX=()=>S.tx.filter(t=>!t.del);
+const ITEMS=k=>S.items.filter(i=>i.k===k&&!i.del).sort((a,b)=>a.ts-b.ts);
+const unread=()=>ITEMS('msg').filter(m=>m.dv!==ui.dev&&m.ts>ui.read).length;
 const cat=id=>S.cats.find(c=>c.id===id);
 const col=c=>HEX.test(c?.color||'')?c.color:'#64748b';
 const exps=()=>S.cats.filter(c=>c.k==='exp');
@@ -108,15 +113,18 @@ function crossMsg(before){for(const k in before){const [ym,id]=k.split('|');cons
 /* ---------- mutations ---------- */
 function pushHist(){hist.push(JSON.stringify(S));if(hist.length>60)hist.shift()}
 function markDirty(id){if(SY.on&&!SY.dirty.includes(id))SY.dirty.push(id)}
-function change(fn,{tx=[],cfg=false,undo=true}={}){
+function markIDirty(id){if(SY.on&&!SY.idirty.includes(id))SY.idirty.push(id)}
+function change(fn,{tx=[],items=[],cfg=false,undo=true}={}){
   if(undo)pushHist();
   sample=false;
   const r=fn();const t=Date.now();
   tx.forEach(id=>{const x=S.tx.find(y=>y.id===id);if(x){x.u=t;markDirty(id)}});
+  items.forEach(id=>{const x=S.items.find(y=>y.id===id);if(x){x.u=t;markIDirty(id)}});
   if(cfg){S.su=t;if(SY.on)SY.cfgDirty=true}
   persist();render();Sync.schedule();
   return r;
 }
+function removeItem(id){const i=S.items.findIndex(t=>t.id===id);if(i<0)return;if(SY.on){S.items[i].del=1}else S.items.splice(i,1)}
 function removeTx(id){const i=S.tx.findIndex(t=>t.id===id);if(i<0)return;if(SY.on){S.tx[i].del=1}else S.tx.splice(i,1)}
 function replaceAll(next){
   const t=Date.now();
@@ -125,6 +133,9 @@ function replaceAll(next){
     const strip=x=>JSON.stringify({...x,u:0});
     next.tx.forEach(x=>{const p=prev.get(x.id);if(!p||strip(p)!==strip(x)){x.u=t;markDirty(x.id)}});
     prev.forEach((p,id)=>{if(!nids.has(id)&&!p.del){next.tx.push({...p,del:1,u:t});markDirty(id)}});
+    const prevI=new Map(S.items.map(x=>[x.id,x]));const nI=new Set(next.items.map(x=>x.id));
+    next.items.forEach(x=>{const p=prevI.get(x.id);if(!p||strip(p)!==strip(x)){x.u=t;markIDirty(x.id)}});
+    prevI.forEach((p,id)=>{if(!nI.has(id)&&!p.del){next.items.push({...p,del:1,u:t});markIDirty(id)}});
     SY.cfgDirty=true;
   }
   next.su=t;S=next;sample=false;persist();render();Sync.schedule();
@@ -178,13 +189,18 @@ const Sync={busy:false,again:false,timer:null,upBusy:false,
     try{
       const ids=[...new Set(SY.dirty)],sentU={};
       const tx=ids.map(id=>{const t=S.tx.find(x=>x.id===id);if(!t)return null;sentU[id]=t.u;return {id:t.id,d:t.d,t:t.t,a:t.a,c:t.c,cn:cat(t.c)?.name||'',n:t.n,img:t.img||'',u:t.u,del:t.del?1:0}}).filter(Boolean);
+      const iids=[...new Set(SY.idirty)],sentI={};
+      const items=iids.map(id=>{const t=S.items.find(x=>x.id===id);if(!t)return null;sentI[id]=t.u;return {...t,del:t.del?1:0}}).filter(Boolean);
       const cfgSent=SY.cfgDirty,su=S.su;
-      const res=await this.call({action:'sync',since:full?0:SY.since,full,tx,cfg:cfgSent?{cats:S.cats,goal:G(),alertPct:AP(),name:S.profile.name,u:S.su}:null});
+      const res=await this.call({action:'sync',since:full?0:SY.since,full,tx,items,cfg:cfgSent?{cats:S.cats,goal:G(),alertPct:AP(),name:S.profile.name,u:S.su}:null});
       if(!res||!res.ok)throw new Error(res&&res.err||'server');
       SY.dirty=SY.dirty.filter(id=>{const t=S.tx.find(x=>x.id===id);return t&&t.u!==sentU[id]});
       if(cfgSent&&S.su===su)SY.cfgDirty=false;
+      SY.sv=+res.v||2;
+      if(SY.sv>=3)SY.idirty=SY.idirty.filter(id=>{const t=S.items.find(x=>x.id===id);return t&&t.u!==sentI[id]});
       const changed=applyRemote(res,full);
       S.tx=S.tx.filter(t=>!(t.del&&!SY.dirty.includes(t.id)));
+      if(SY.sv>=3)S.items=S.items.filter(t=>!(t.del&&!SY.idirty.includes(t.id)));
       SY.since=+res.now||SY.since;SY.last=Date.now();SY.err='';if(res.sheet)SY.sheet=res.sheet;
       persist();if(changed)render();setSync('ok');
       this.uploadImgs();
@@ -195,7 +211,7 @@ const Sync={busy:false,again:false,timer:null,upBusy:false,
   async uploadImgs(){
     if(!SY.on||this.upBusy)return;this.upBusy=true;
     try{
-      const used=[...new Set(TX().map(t=>t.img).filter(Boolean))];
+      const used=[...new Set(TX().map(t=>t.img).concat(ITEMS('pic').map(p=>p.img)).filter(Boolean))];
       for(const k of used){let v=null;try{v=await IDB.get('i:'+k)}catch{}if(!v||v.up)continue;
         const r=await this.call({action:'img',id:k,b64:bufToB64(v.buf),mime:v.type});
         if(r&&r.ok){v.up=true;await IDB.put('i:'+k,v).catch(()=>{})}}
@@ -241,6 +257,18 @@ function applyRemote(res,full){
     if(i>=0)S.tx[i]=o;else S.tx.push(o);changed=true;
   });
   if(full&&Array.isArray(res.ids)){const set=new Set(res.ids.map(String));const n=S.tx.length;S.tx=S.tx.filter(t=>set.has(t.id)||SY.dirty.includes(t.id));if(S.tx.length!==n)changed=true}
+  const fresh=[];
+  (res.items||[]).forEach(r=>{
+    const o=normItem(r);if(!o)return;
+    const i=S.items.findIndex(x=>x.id===o.id),loc=S.items[i];
+    if(loc&&SY.idirty.includes(o.id)&&(loc.u||0)>(o.u||0))return;
+    if(o.del){if(i>=0){S.items.splice(i,1);changed=true}return}
+    if(loc&&JSON.stringify(loc)===JSON.stringify(o))return;
+    if(!loc&&o.k==='msg'&&o.dv!==ui.dev&&o.ts>ui.read)fresh.push(o);
+    if(i>=0)S.items[i]=o;else S.items.push(o);changed=true;
+  });
+  if(full&&Array.isArray(res.itemIds)){const set=new Set(res.itemIds.map(String));const n=S.items.length;S.items=S.items.filter(t=>set.has(t.id)||SY.idirty.includes(t.id));if(S.items.length!==n)changed=true}
+  if(fresh.length&&ui.view!=='msgs'){const m=fresh[fresh.length-1];toast(`הודעה חדשה${m.by?' מ'+m.by:''}: ${m.text.slice(0,60)}`)}
   return changed;
 }
 let syncState='off';
@@ -255,19 +283,19 @@ async function connectNew(url){
   url=url.trim();if(!validUrl(url))throw new Error('url');
   const key=rid(24);const res=await Sync.call({action:'pair'},url,key);
   if(!res||!res.ok)throw new Error(res&&res.err||'server');
-  startSync(url,key,true,res.sheet);
+  startSync(url,key,true,res.sheet,res.v);
 }
 async function connectJoin(code,merge){
   const o=dec(code);if(!o)throw new Error('code');
   const res=await Sync.call({action:'ping'},o.u,o.k);
   if(!res||!res.ok)throw new Error(res&&res.err||'server');
-  startSync(o.u,o.k,merge,res.sheet);
+  startSync(o.u,o.k,merge,res.sheet,res.v);
 }
-function startSync(url,key,merge,sheet){
+function startSync(url,key,merge,sheet,v){
   if(sample){S=blank();sample=false}
-  SY={on:true,url,key,since:0,dirty:[],cfgDirty:false,last:0,err:'',sheet:sheet||''};
-  if(merge){S.tx=S.tx.filter(t=>!t.del);S.tx.forEach(t=>{t.u=t.u||Date.now();SY.dirty.push(t.id)});S.su=Date.now();SY.cfgDirty=true}
-  else{S.tx=[];S.su=0}
+  SY={on:true,url,key,since:0,dirty:[],idirty:[],cfgDirty:false,last:0,err:'',sheet:sheet||'',sv:+v||2};
+  if(merge){S.tx=S.tx.filter(t=>!t.del);S.tx.forEach(t=>{t.u=t.u||Date.now();SY.dirty.push(t.id)});S.items=S.items.filter(t=>!t.del);S.items.forEach(t=>{t.u=t.u||Date.now();SY.idirty.push(t.id)});S.su=Date.now();SY.cfgDirty=true}
+  else{S.tx=[];S.items=[];S.su=0}
   hist=[];persistNow();render();Sync.run(true);
 }
 
@@ -288,24 +316,25 @@ let xlsxP=null;
 function loadXLSX(){if(window.XLSX)return Promise.resolve();return xlsxP||(xlsxP=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=()=>res();s.onerror=()=>{xlsxP=null;rej(new Error('xlsx'))};document.head.appendChild(s)}))}
 
 /* ---------- chrome: drawer, router, status ---------- */
-const TITLES={home:'סקירה',tx:'תנועות',budget:'תקציב ויעד',import:'ייבוא מאקסל ושיטס',sync:'סנכרון משותף',backup:'גיבוי וייצוא',profile:'פרופיל והתקנה'};
+const TITLES={home:'סקירה',tx:'תנועות',budget:'תקציב ויעד',msgs:'הודעות',album:'תמונות ושומר מסך',import:'ייבוא מאקסל ושיטס',sync:'סנכרון משותף',backup:'גיבוי וייצוא',profile:'פרופיל והתקנה'};
 function openDrawer(){$('#drawer').classList.add('open');$('#scrim').hidden=false;$('#menuBtn').setAttribute('aria-expanded','true');setTimeout(()=>$('#drawer .menu a.on, #drawer .menu a')?.focus(),50)}
 function closeDrawer(){$('#drawer').classList.remove('open');$('#scrim').hidden=true;$('#menuBtn').setAttribute('aria-expanded','false')}
 function openSpeed(){$('#speed').hidden=false;$('#scrim2').hidden=false;$('#fab').setAttribute('aria-expanded','true')}
 function closeSpeed(){$('#speed').hidden=true;$('#scrim2').hidden=true;$('#fab').setAttribute('aria-expanded','false')}
 function route(){
   const v=(location.hash||'#home').slice(1);ui.view=TITLES[v]?v:'home';
-  $$('.view').forEach(s=>s.hidden=s.dataset.view!==ui.view);
+  $$('.view').forEach(s=>s.hidden=s.dataset.view!==ui.view);document.body.dataset.view=ui.view;$('#msgF').hidden=ui.view!=='msgs';
   $$('[data-nav]').forEach(a=>{const on=a.dataset.nav===ui.view;a.classList.toggle('on',on);if(on)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
-  $('#vTitle').textContent=ui.view==='home'&&S.profile.name?S.profile.name:TITLES[ui.view];
+  $('#vTitle').textContent=TITLES[ui.view];
   $('#mnav').hidden=!['home','tx','budget'].includes(ui.view);
-  closeDrawer();closeSpeed();render();window.scrollTo(0,0);
+  closeDrawer();closeSpeed();render();if(ui.view==='msgs')scrollChat();else window.scrollTo(0,0);
 }
 let avatarURL=null;
 async function loadAvatar(){let v=null;try{v=await IDB.get('profile')}catch{}if(avatarURL){URL.revokeObjectURL(avatarURL);avatarURL=null}if(v)avatarURL=URL.createObjectURL(new Blob([v.buf],{type:v.type}));
   $$('.avatar').forEach(a=>{const im=$('img',a),sp=$('span',a);if(avatarURL){im.src=avatarURL;im.hidden=false;sp.hidden=true}else{im.hidden=true;im.removeAttribute('src');sp.hidden=false}});$('#pPhotoDel').hidden=!avatarURL}
 function chrome(){
-  $('#hhName').textContent=S.profile.name||'הכסף שלי';
+  const nm=S.profile.name||'הכסף שלי';$('#hhName').textContent=nm;document.title=nm;$('meta[name=apple-mobile-web-app-title]')?.setAttribute('content',nm);
+  const un=unread();$$('[data-unread]').forEach(b=>{b.hidden=!un;b.textContent=un>9?'9+':String(un)});
   $('#mlabel').textContent=MN[mIdx(ui.cur)]+' '+ui.cur.slice(0,4);
   const sd=$('#sdot');sd.className='sdot '+(SY.on?syncState:'');
   const txt=!SY.on?(storageOk?'שמור במכשיר הזה':'הדפדפן חוסם שמירה, הורד גיבוי'):syncState==='busy'?'מסנכרן…':syncState==='err'?'הסנכרון נכשל, יש שינויים שמחכים':syncState==='offline'?'אין אינטרנט, השינויים מחכים':`מסונכרן עם הגיליון, ${agoText(SY.last)}`;
@@ -324,7 +353,8 @@ function renderHome(){
   const ch=(a,b)=>b?`${a>=b?'↑':'↓'} ${Math.abs(Math.round((a-b)/b*100))}% מהחודש הקודם`:'אין נתון לחודש הקודם';
   const f=[['הכנסות',fmt(inc),ch(inc,pi)],['הוצאות',fmt(exp),ch(exp,pe)],['הופרש לחיסכון',fmt(sv),inc?`${Math.round(sv/inc*100)}% מההכנסות`:'לפי קטגוריית החיסכון'],['הוצאה ממוצעת ליום',fmt(exp/days),`על פני ${days} ימים`]];
   $('#figs').innerHTML=f.map(x=>`<div><span>${esc(x[0])}</span><b>${esc(x[1])}</b><small>${esc(x[2])}</small></div>`).join('');
-  $('#noteHome').hidden=!sample;
+  $('#noteHome').hidden=!sample;$('#hName').textContent=S.profile.name;
+  renderHomeMsg();renderHomeAlbum();
   renderAlerts();renderGoal();renderCats();drawChart();
   const rec=inM(cur).sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0).slice(0,6);
   $('#recent').innerHTML=rec.length?`<div class="dayl">${rec.map(t=>txRow(t,true)).join('')}</div>`:'<p class="empty">אין תנועות בחודש הזה.</p>';
@@ -449,6 +479,7 @@ function renderSync(){
 <div class="status${bad?' err':''}"><svg class="ic"><use href="#i-${bad?'alert':'check'}"/></svg><div><b>${bad?'הסנכרון נכשל':'מחובר לגיליון משותף'}</b><small>${esc(bad?SY.err:`עודכן ${agoText(SY.last)}${pend?`, ${pend} שינויים מחכים`:''}`)}</small></div></div>
 <p class="hint">כל שינוי שאתה עושה נשלח לגיליון, והאפליקציה בודקת עדכונים מהמכשירים האחרים כל 20 שניות. אפשר גם לערוך ישירות בגיליון, והשינויים יגיעו לאפליקציה.</p>
 <div class="btnrow"><button class="btn solid" data-act="sync-now">סנכרן עכשיו</button>${SY.sheet&&/^https:\/\//.test(SY.sheet)?`<a class="btn" href="${esc(SY.sheet)}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-sheet"/></svg>פתח את הגיליון</a>`:''}</div></div>
+${SY.sv&&SY.sv<3?`<div class="card"><h2>עדכון הסקריפט בגיליון</h2><p class="hint">יש גרסה חדשה של הסקריפט עם תמונות והודעות משותפות. עד שתעדכן, הן נשמרות רק במכשיר ויישלחו אחרי העדכון. מעדכנים פעם אחת, ממכשיר אחד:</p><ol class="steps"><li><div><b>פותחים את עורך הסקריפטים</b><p>בגיליון: <kbd>Extensions</kbd> ← <kbd>Apps Script</kbd>.</p></div></li><li><div><b>מחליפים את הקוד</b><p>מוחקים את כל הקוד הישן, מדביקים את החדש ושומרים.</p><button class="btn solid sm" data-act="copy-gs">העתק את הקוד החדש</button></div></li><li><div><b>מפרסמים גרסה חדשה</b><p><kbd>Deploy</kbd> ← <kbd>Manage deployments</kbd> ← סמל העיפרון ← ב־<kbd>Version</kbd> בוחרים <kbd>New version</kbd> ← <kbd>Deploy</kbd>. הכתובת לא משתנה ואין צורך לחבר מחדש.</p></div></li></ol><button class="btn sm" data-act="sync-now">בדוק שוב</button></div>`:''}
 <div class="card"><h2>הוספת שותף</h2><p class="hint">שלח את הקוד הזה למי שמנהל איתך את החשבון. הוא פותח את האפליקציה, נכנס לסנכרון משותף ובוחר "הצטרפות עם קוד". מי שיש לו את הקוד יכול לראות ולשנות את הנתונים, אז שלח אותו רק למי שאתה סומך עליו.</p>
 <textarea class="field code" readonly rows="3" id="invTxt">${esc(inviteCode())}</textarea>
 <div class="btnrow"><button class="btn solid" data-act="share-code">שלח קוד הצטרפות</button><button class="btn" data-act="copy-code">העתק</button></div></div>
@@ -571,7 +602,8 @@ function doImport(){
 /* ---------- render all ---------- */
 function render(){
   chrome();
-  if(ui.view==='home')renderHome();else if(ui.view==='tx')renderTx();else if(ui.view==='budget')renderBudget();else if(ui.view==='sync')renderSync();else if(ui.view==='import')renderImport();else if(ui.view==='profile')$('#pName').value=S.profile.name;
+  if(ui.view==='home')renderHome();else if(ui.view==='tx')renderTx();else if(ui.view==='budget')renderBudget();else if(ui.view==='sync')renderSync();else if(ui.view==='import')renderImport();else if(ui.view==='msgs')renderMsgs();else if(ui.view==='album')renderAlbum();else if(ui.view==='profile'){$('#pName').value=S.profile.name;$('#pMe').value=ui.me}
+  if(ui.view!=='home')stopHomeAlbum();
 }
 
 /* ---------- transaction sheet ---------- */
@@ -649,7 +681,7 @@ const ACT={
   'sync-now':()=>Sync.run(true),
   'copy-code':()=>copyText(inviteCode(),'קוד ההצטרפות הועתק','קוד הצטרפות'),
   'share-code':async()=>{const text=`קוד הצטרפות לחשבון המשותף שלנו ב"הכסף שלי":\n${inviteCode()}\n\nפותחים את ${APP_URL} ← תפריט ← סנכרון משותף ← הצטרפות עם קוד.`;if(navigator.share){try{await navigator.share({title:'הכסף שלי, קוד הצטרפות',text});return}catch(e){if(e&&e.name==='AbortError')return}}copyText(text,'ההזמנה הועתקה, הדבק אותה בוואטסאפ','הזמנה')},
-  disconnect:async()=>{if(!(await ask('לנתק את המכשיר?','המכשיר יפסיק לסנכרן. הנתונים נשארים במכשיר ובגיליון, ואפשר להצטרף שוב עם הקוד.','נתק')))return;SY={...SY,on:false,dirty:[],cfgDirty:false};S.tx=S.tx.filter(t=>!t.del);persistNow();setSync('off');render();toast('המכשיר נותק מהגיליון')},
+  disconnect:async()=>{if(!(await ask('לנתק את המכשיר?','המכשיר יפסיק לסנכרן. הנתונים נשארים במכשיר ובגיליון, ואפשר להצטרף שוב עם הקוד.','נתק')))return;SY={...SY,on:false,dirty:[],idirty:[],cfgDirty:false};S.tx=S.tx.filter(t=>!t.del);S.items=S.items.filter(t=>!t.del);persistNow();setSync('off');render();toast('המכשיר נותק מהגיליון')},
   'copy-gs':()=>{if(!GS){toast('הקוד עוד לא נטען, נסה שוב בעוד רגע');return}copyText(GS,'הקוד הועתק. הדבק אותו בעורך של Apps Script','קוד הסקריפט')},
   'show-gs':()=>{if(GS)showText('קוד הסקריפט','מעתיקים את כל הטקסט ומדביקים בעורך של Apps Script.',GS)},
   connect:async(btn)=>{const url=$('#gsUrl').value.trim(),er=$('#gsErr');er.textContent='';try{sessionStorage.setItem('kesef-url',url)}catch{}
@@ -657,6 +689,7 @@ const ACT={
     btn.disabled=true;btn.textContent='מתחבר…';try{await connectNew(url);toast('הגיליון חובר. עכשיו אפשר לשלוח קוד הצטרפות לשותף');location.hash='#sync';renderSync()}catch(e){er.textContent=errText(e);btn.disabled=false;btn.textContent='חבר את הגיליון'}},
   join:async(btn)=>{const er=$('#joinErr');er.textContent='';const code=$('#joinCode').value;if(!dec(code)){er.textContent='הקוד לא נראה תקין. הוא מתחיל ב־KSF1.';return}
     btn.disabled=true;btn.textContent='מצטרף…';try{await connectJoin(code,$('#joinMerge').checked);toast('הצטרפת לחשבון המשותף');renderSync()}catch(e){er.textContent=e.message==='code'?'הקוד לא תקין.':errText(e);btn.disabled=false;btn.textContent='הצטרף'}},
+  ss:()=>SS.start(),
   'imp-go':doImport,
   'imp-cancel':()=>{IMP.aoa=[];IMP.parsed=null;$('#impFile').value='';renderImport()}
 };
@@ -756,12 +789,112 @@ $('#xlsxDown').addEventListener('click',async e=>{const b=e.currentTarget;b.disa
 
 /* profile */
 $('#pName').addEventListener('change',e=>{const v=e.target.value.trim().slice(0,40);if(v===S.profile.name)return;change(()=>{S.profile.name=v},{cfg:true,undo:false});route()});
+$('#pMe').addEventListener('change',e=>{ui.me=e.target.value.trim().slice(0,40);persist();toast('השם נשמר')});
 $('#pPhoto').addEventListener('click',()=>$('#pFile').click());$('#pAvatar').addEventListener('click',()=>$('#pFile').click());
 $('#pFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const d=await compress(f,512);await IDB.put('profile',d);await loadAvatar();toast('התמונה עודכנה')}catch{toast('לא הצלחתי לשמור את התמונה')}});
 $('#pPhotoDel').addEventListener('click',async()=>{try{await IDB.del('profile')}catch{}loadAvatar()});
 
+/* ---------- messages ---------- */
+const hm=ts=>{const d=new Date(ts);return `${p2(d.getHours())}:${p2(d.getMinutes())}`};
+const dkey=ts=>{const d=new Date(ts);return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`};
+function updNote(el,what){
+  if(!SY.on){el.innerHTML=`${what} נשמרים במכשיר הזה. כדי שיגיעו גם למי שמנהל איתך את החשבון, <a href="#sync">חבר סנכרון משותף</a>.`;el.hidden=false;return}
+  if(SY.sv&&SY.sv<3){el.innerHTML=`כדי ש${what} יגיעו לשותף צריך לעדכן את הסקריפט בגיליון. זה לוקח שתי דקות: <a href="#sync">איך מעדכנים</a>.`;el.hidden=false;return}
+  el.hidden=true;
+}
+function renderMsgs(){
+  updNote($('#msgUpd'),'ההודעות');
+  const list=ITEMS('msg');let last='';
+  $('#chat').innerHTML=list.length?list.map(m=>{const mine=m.dv===ui.dev,dk=dkey(m.ts);let sep='';if(dk!==last){last=dk;sep=`<div class="cday">${esc(dayLabel(dk))}</div>`}
+    return `${sep}<div class="msg${mine?' me':''}${SY.on&&SY.idirty.includes(m.id)?' pend':''}"><p>${esc(m.text)}</p><div class="mm"><span>${mine?'':`<b>${esc(m.by||'שותף')}</b> `}${hm(m.ts)}</span>${mine?`<button class="mx" data-mdel="${esc(m.id)}">מחק</button>`:''}</div></div>`}).join('')
+    :'<div class="card empty">עוד אין הודעות. כתבו כאן תזכורות, בקשות או סתם מילה טובה, וכל מי שמחובר לחשבון יראה.</div>';
+  $('#meIn').hidden=!!ui.me;
+  const mx=Math.max(0,...list.filter(m=>m.dv!==ui.dev).map(m=>m.ts));if(mx>ui.read){ui.read=mx;persist()}
+}
+function scrollChat(){requestAnimationFrame(()=>window.scrollTo(0,document.body.scrollHeight))}
+function renderHomeMsg(){
+  const c=$('#homeMsg'),list=ITEMS('msg');
+  if(!list.length&&!SY.on){c.hidden=true;return}c.hidden=false;const un=unread();
+  c.innerHTML=`<div class="ch"><h2>הודעות${un?` <span class="cnt" style="vertical-align:3px">${un}</span>`:''}</h2><a href="#msgs" class="lnk">${list.length?'לכל ההודעות':'כתוב הודעה'}</a></div>`+
+    (list.length?list.slice(-2).map(m=>`<a class="mrow" href="#msgs" style="color:inherit;text-decoration:none"><small>${esc(m.dv===ui.dev?'אני':(m.by||'שותף'))}, ${esc(dayLabel(dkey(m.ts)).split(',')[0])} ${hm(m.ts)}</small><span>${esc(m.text)}</span></a>`).join(''):'<p class="hint" style="margin:0">השאירו כאן הודעות זה לזה. הן יופיעו אצל כל מי שמחובר לחשבון.</p>');
+}
+$('#msgF').addEventListener('submit',e=>{e.preventDefault();
+  if(!ui.me){const v=$('#meIn').value.trim().slice(0,40);if(!v){$('#meIn').focus();toast('כתוב קודם איך קוראים לך');return}ui.me=v}
+  const text=$('#msgIn').value.trim().slice(0,2000);if(!text)return;
+  const it={id:rid(16),k:'msg',by:ui.me,dv:ui.dev,ts:Date.now(),text,img:'',u:0};
+  change(()=>S.items.push(it),{items:[it.id],undo:false});
+  $('#msgIn').value='';$('#msgIn').style.height='';scrollChat();Sync.schedule(300);
+});
+$('#msgIn').addEventListener('input',e=>{const t=e.target;t.style.height='';t.style.height=Math.min(140,t.scrollHeight+2)+'px'});
+$('#msgIn').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&matchMedia('(hover:hover)').matches){e.preventDefault();$('#msgF').requestSubmit()}});
+$('#chat').addEventListener('click',e=>{const b=e.target.closest('[data-mdel]');if(!b)return;const id=b.dataset.mdel;change(()=>removeItem(id),{items:[id]});toast('ההודעה נמחקה',true)});
+
+/* ---------- album ---------- */
+function renderAlbum(){
+  updNote($('#albUpd'),'התמונות');
+  const list=ITEMS('pic').reverse();
+  $('#albCount').textContent=list.length?`${list.length} תמונות`:'';
+  $('#agrid').innerHTML=list.length?list.map(p=>`<button class="aitem" data-pic="${esc(p.id)}" aria-label="${esc(p.text||'תמונה')}"><img data-img="${esc(p.img)}" alt="">${p.text?`<small>${esc(p.text)}</small>`:''}</button>`).join(''):'<p class="hint" style="grid-column:1/-1;margin:0">עוד אין תמונות. הוסיפו תמונות של הבית, של הזוג או של מה שאתם חוסכים בשבילו.</p>';
+  hydrate($('#agrid'));
+  $('#ssInt').value=String(ui.ss.int);$('#ssIdle').value=String(ui.ss.idle);$('#ssInfo').checked=ui.ss.info;
+}
+$('#albAdd').addEventListener('click',()=>$('#albFile').click());
+$('#albFile').addEventListener('change',async e=>{const fs=[...e.target.files];e.target.value='';if(!fs.length)return;
+  const made=[];toast(`מוסיף ${fs.length} תמונות…`);
+  for(const f of fs){try{const d=await compress(f,1600);const img=rid(16);await IDB.put('i:'+img,{buf:d.buf,type:d.type,up:false});made.push({id:rid(16),k:'pic',by:ui.me,dv:ui.dev,ts:Date.now()+made.length,text:'',img,u:0})}catch{}}
+  if(!made.length){toast('לא הצלחתי להוסיף את התמונות');return}
+  change(()=>made.forEach(m=>S.items.push(m)),{items:made.map(m=>m.id)});
+  toast(made.length===1?'התמונה נוספה':`נוספו ${made.length} תמונות`,true);Sync.schedule(400);
+});
+let picId=null;
+$('#agrid').addEventListener('click',async e=>{const b=e.target.closest('[data-pic]');if(!b)return;const p=S.items.find(x=>x.id===b.dataset.pic);if(!p)return;picId=p.id;
+  $('#picCap').value=p.text||'';$('#picBy').textContent=`${p.by?p.by+', ':''}${new Date(p.ts).toLocaleDateString('he-IL')}`;$('#picImg').removeAttribute('src');show($('#dPic'));const u=await imgURL(p.img);if(u)$('#picImg').src=u});
+$('#picSave').addEventListener('click',()=>{const id=picId,v=$('#picCap').value.trim().slice(0,200);change(()=>{const p=S.items.find(x=>x.id===id);if(p)p.text=v},{items:[id]});hide($('#dPic'));toast('הכיתוב נשמר')});
+$('#picDel').addEventListener('click',async()=>{const id=picId;if(!(await ask('למחוק את התמונה?',SY.on?'התמונה תימחק גם אצל כל מי שמחובר לחשבון.':'התמונה תימחק מהמכשיר.','מחק',true)))return;hide($('#dPic'));change(()=>removeItem(id),{items:[id]});toast('התמונה נמחקה',true)});
+$('#ssInt').addEventListener('change',e=>{ui.ss.int=clamp(+e.target.value||8,3,120);persist()});
+$('#ssIdle').addEventListener('change',e=>{ui.ss.idle=clamp(+e.target.value||0,0,60);persist();resetIdle();if(ui.ss.idle)toast(`שומר המסך יופעל אחרי ${ui.ss.idle===1?'דקה':ui.ss.idle+' דקות'} בלי נגיעה`)});
+$('#ssInfo').addEventListener('change',e=>{ui.ss.info=e.target.checked;persist()});
+let homeT=null,homeI=0,homeL=0;
+function stopHomeAlbum(){clearInterval(homeT);homeT=null}
+async function homeNext(){const list=ITEMS('pic');const c=$('#homeAlbum');if(!list.length||c.hidden)return;const p=list[homeI++%list.length];const u=await imgURL(p.img);if(!u)return;
+  const ls=$$('.ssimg',c);if(ls.length<2)return;const a=ls[homeL],b=ls[1-homeL];homeL=1-homeL;a.style.backgroundImage=`url("${u}")`;a.classList.remove('on');void a.offsetWidth;a.classList.add('on');b.classList.remove('on');const cap=$('.cap',c);if(cap)cap.textContent=p.text||''}
+function renderHomeAlbum(){
+  const c=$('#homeAlbum'),list=ITEMS('pic');c.hidden=false;
+  if(!list.length){stopHomeAlbum();c.className='card albumcard empty';c.innerHTML=`<div class="ch"><h2>התמונות שלנו</h2><a href="#album" class="lnk">הוסף תמונות</a></div><p class="hint" style="margin:0">תמונות שיתחלפו כאן וגם כשומר מסך, ויופיעו אצל כל מי שמחובר לחשבון.</p>`;return}
+  if(homeT&&c.dataset.n===String(list.length))return;
+  c.className='card albumcard';c.dataset.n=String(list.length);
+  c.innerHTML=`<div class="ssimg"></div><div class="ssimg"></div><div class="ac"><div><b>${esc(S.profile.name||'התמונות שלנו')}</b><span class="cap"></span></div><div class="btnrow" style="margin:0"><a class="btn sm" href="#album">לאלבום</a><button class="btn sm" data-act="ss"><svg class="ic"><use href="#i-play"/></svg>שומר מסך</button></div></div>`;
+  stopHomeAlbum();homeI=Math.floor(Math.random()*list.length);homeNext();homeT=setInterval(homeNext,7000);
+}
+
+/* ---------- screensaver ---------- */
+const SS={on:false,t:null,clk:null,i:0,list:[],lock:null,layer:0,
+  async start(){
+    if(this.on)return;this.on=true;closeSpeed();closeDrawer();
+    const el=$('#ss');el.hidden=false;this.list=ITEMS('pic').slice().sort(()=>Math.random()-.5);this.i=0;
+    el.classList.toggle('noimg',!this.list.length);$('#ssName').textContent=S.profile.name||'הכסף שלי';$('#ssText').textContent=this.list.length?'':'הוסיפו תמונות באלבום כדי שיתחלפו כאן';
+    this.info();this.clk=setInterval(()=>this.info(),10000);
+    await this.next();this.t=setInterval(()=>this.next(),ui.ss.int*1000);
+    this.wake();
+  },
+  async wake(){try{if(this.on&&navigator.wakeLock&&document.visibilityState==='visible')this.lock=await navigator.wakeLock.request('screen')}catch{}},
+  stop(){if(!this.on)return;this.on=false;clearInterval(this.t);clearInterval(this.clk);$('#ss').hidden=true;$$('#ss .ssimg').forEach(e=>{e.classList.remove('on');e.style.backgroundImage=''});try{this.lock?.release()}catch{}this.lock=null;resetIdle()},
+  async next(){if(!this.list.length)return;const p=this.list[this.i++%this.list.length];const u=await imgURL(p.img);if(!u||!this.on)return;
+    const a=$('#ssA'),b=$('#ssB'),[sh,hd]=this.layer?[a,b]:[b,a];this.layer^=1;sh.style.backgroundImage=`url("${u}")`;sh.classList.remove('on');void sh.offsetWidth;sh.classList.add('on');hd.classList.remove('on');$('#ssText').textContent=p.text||''},
+  info(){const on=ui.ss.info;$('#ssInfoBox').hidden=!on;if(!on)return;const d=new Date();$('#ssClock').textContent=`${p2(d.getHours())}:${p2(d.getMinutes())}`;$('#ssDate').textContent=`${DN[d.getDay()]}, ${d.getDate()} ב${MN[d.getMonth()]}`;
+    const net=tot(nowYm,'inc')-tot(nowYm,'exp');$('#ssLine').textContent=inM(nowYm).length?(net>=0?`נשארו ${fmt(net)} החודש`:`חריגה של ${fmt(-net)} החודש`):''}
+};
+$('#ss').addEventListener('pointerdown',()=>SS.stop());
+let idleT=null,lastAct=0;
+function resetIdle(){clearTimeout(idleT);if(!ui.ss.idle||SS.on)return;idleT=setTimeout(()=>{
+  const busy=$$('dialog').some(d=>d.open)||document.activeElement?.matches?.('input,textarea,select')||document.visibilityState!=='visible';
+  if(busy)resetIdle();else SS.start()},ui.ss.idle*60000)}
+['pointerdown','keydown','wheel','touchstart'].forEach(ev=>window.addEventListener(ev,()=>{const n=Date.now();if(n-lastAct>1000){lastAct=n;resetIdle()}},{passive:true}));
+document.addEventListener('keydown',e=>{if(SS.on){e.preventDefault();SS.stop()}},true);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')SS.wake()});
+
 /* ---------- boot ---------- */
-load();route();loadAvatar();
+load();route();loadAvatar();resetIdle();
 if(SY.on){setSync('ok');Sync.run(true)}
 setInterval(()=>{if(SY.on&&document.visibilityState==='visible')Sync.run()},20000);
 setInterval(()=>{if(SY.on)chrome()},30000);

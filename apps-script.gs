@@ -10,9 +10,16 @@ var FOLDER = 'הכסף שלי - קבלות';
 var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's'];
 var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11};
 var TECH = H.length - C.id;
+var VERSION = 3;
+var KINDS = {
+  msg: {name: 'הודעות', H: ['תאריך', 'מאת', 'הודעה', 'נמחק', 'id', 'u', 's', 'data'], V: 4, D: 3,
+    vis: function (it) { return [new Date(it.ts), safe_(it.by), safe_(it.text), it.del ? 'כן' : '']; }},
+  pic: {name: 'תמונות', H: ['תאריך', 'מאת', 'כיתוב', 'תמונה', 'נמחק', 'id', 'u', 's', 'data'], V: 5, D: 4, L: 4,
+    vis: function (it) { return [new Date(it.ts), safe_(it.by), safe_(it.text), '', it.del ? 'כן' : '']; }}
+};
 
 function doGet() {
-  return out_({ok: true, app: 'kesef', v: 2});
+  return out_({ok: true, app: 'kesef', v: VERSION});
 }
 
 function doPost(e) {
@@ -28,10 +35,10 @@ function doPost(e) {
       if (key && key !== req.key) return out_({ok: false, err: 'paired'});
       props.setProperty('KEY', String(req.key));
       setup_();
-      return out_({ok: true, now: Date.now(), sheet: SpreadsheetApp.getActive().getUrl()});
+      return out_({ok: true, v: VERSION, now: Date.now(), sheet: SpreadsheetApp.getActive().getUrl()});
     }
     if (!key || req.key !== key) return out_({ok: false, err: 'key'});
-    if (req.action === 'ping') return out_({ok: true, now: Date.now(), sheet: SpreadsheetApp.getActive().getUrl()});
+    if (req.action === 'ping') return out_({ok: true, v: VERSION, now: Date.now(), sheet: SpreadsheetApp.getActive().getUrl()});
     if (req.action === 'sync') return out_(sync_(req));
     if (req.action === 'img') return out_(putImg_(req));
     if (req.action === 'getimg') return out_(getImg_(req));
@@ -184,7 +191,80 @@ function sync_(req) {
   } else if ((since === 0 || cs > since) && cv[0]) {
     try { cfg = JSON.parse(cv[0]); } catch (e) {}
   }
-  return {ok: true, now: now, tx: out, ids: req.full ? ids : undefined, cfg: cfg, sheet: SpreadsheetApp.getActive().getUrl()};
+  var it = syncItems_(req, since, now, imgs);
+  return {ok: true, v: VERSION, now: now, tx: out, ids: req.full ? ids : undefined, cfg: cfg,
+    items: it.items, itemIds: req.full ? it.ids : undefined, sheet: SpreadsheetApp.getActive().getUrl()};
+}
+
+function kindSheet_(k) {
+  var K = KINDS[k], ss = SpreadsheetApp.getActive(), sh = ss.getSheetByName(K.name);
+  if (!sh) {
+    sh = ss.insertSheet(K.name);
+    sh.getRange(1, 1, 1, K.H.length).setValues([K.H]).setFontWeight('bold').setBackground('#00a862').setFontColor('#0b0b10');
+    sh.setFrozenRows(1);
+    try { sh.setRightToLeft(true); } catch (e) {}
+    sh.getRange('A2:A').setNumberFormat('dd/MM/yyyy HH:mm');
+    sh.hideColumns(K.V + 1, 4);
+  }
+  return sh;
+}
+
+function cleanItem_(it, k, now) {
+  return {k: k, id: String(it.id).replace(/[^a-z0-9]/gi, '').slice(0, 40), u: +it.u || now, del: it.del ? 1 : 0,
+    by: String(it.by || '').slice(0, 40), dv: String(it.dv || '').replace(/[^a-z0-9]/gi, '').slice(0, 20), ts: +it.ts || now, text: String(it.text || '').slice(0, 2000),
+    img: String(it.img || '').replace(/[^a-z0-9]/gi, '').slice(0, 40)};
+}
+
+function linkPic_(sh, k, r, it, imgs) {
+  var K = KINDS[k];
+  if (K.L && it.img && imgs[it.img] && !it.del) sh.getRange(r, K.L).setFormula(link_(imgs[it.img]));
+}
+
+function syncItems_(req, since, now, imgs) {
+  var incoming = {}, out = [], ids = [];
+  (req.items || []).forEach(function (it) {
+    if (it && it.id && KINDS[it.k]) (incoming[it.k] = incoming[it.k] || []).push(cleanItem_(it, it.k, now));
+  });
+  Object.keys(KINDS).forEach(function (k) {
+    var K = KINDS[k], V = K.V;
+    var sh = SpreadsheetApp.getActive().getSheetByName(K.name);
+    if (!sh && !incoming[k]) return;
+    sh = kindSheet_(k);
+    var n = Math.max(0, sh.getLastRow() - 1);
+    var data = n ? sh.getRange(2, 1, n, K.H.length).getValues() : [];
+    var idx = {}, sent = {}, app = [];
+    for (var r = 0; r < data.length; r++) { var id = String(data[r][V] || ''); if (id) idx[id] = r; }
+    (incoming[k] || []).forEach(function (it) {
+      if (!it.id) return;
+      var row = K.vis(it).concat([it.id, it.u, now, JSON.stringify(it)]), at = idx[it.id];
+      if (at !== undefined) {
+        if (it.u >= (+data[at][V + 1] || 0)) {
+          data[at] = row; sh.getRange(at + 2, 1, 1, row.length).setValues([row]); linkPic_(sh, k, at + 2, it, imgs); sent[it.id] = 1;
+        }
+      } else {
+        idx[it.id] = data.length; data.push(row); app.push({row: row, it: it}); sent[it.id] = 1;
+      }
+    });
+    if (app.length) {
+      var st = sh.getLastRow() + 1;
+      sh.getRange(st, 1, app.length, K.H.length).setValues(app.map(function (x) { return x.row; }));
+      app.forEach(function (x, i) { linkPic_(sh, k, st + i, x.it, imgs); });
+    }
+    for (var i = 0; i < data.length; i++) {
+      var v = data[i], vid = String(v[V] || '');
+      if (!vid) continue;
+      ids.push(vid);
+      if ((since === 0 || (+v[V + 2] || 0) > since) && !sent[vid]) {
+        var o = null;
+        try { o = JSON.parse(v[V + 3]); } catch (e) {}
+        if (o) {
+          if (/^(כן|v|x|1|true|yes)$/i.test(String(v[K.D]).trim())) o.del = 1;
+          o.k = k; out.push(o);
+        }
+      }
+    }
+  });
+  return {items: out, ids: ids};
 }
 
 function writeCats_(cf, cfg) {
@@ -217,6 +297,11 @@ function putImg_(req) {
   if (n > 0) {
     var col = sh.getRange(2, C.img + 1, n, 1).getValues();
     for (var i = 0; i < n; i++) if (String(col[i][0]) === id) sh.getRange(i + 2, C.rc + 1).setFormula(link_(f.getId()));
+  }
+  var ps = SpreadsheetApp.getActive().getSheetByName(KINDS.pic.name);
+  if (ps && ps.getLastRow() > 1) {
+    var K = KINDS.pic, dcol = ps.getRange(2, K.V + 4, ps.getLastRow() - 1, 1).getValues();
+    for (var j = 0; j < dcol.length; j++) if (String(dcol[j][0]).indexOf('"img":"' + id + '"') >= 0) ps.getRange(j + 2, K.L).setFormula(link_(f.getId()));
   }
   return {ok: true, file: f.getId()};
 }
