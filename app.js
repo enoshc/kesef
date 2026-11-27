@@ -370,13 +370,13 @@ let xlsxP=null;
 function loadXLSX(){if(window.XLSX)return Promise.resolve();return xlsxP||(xlsxP=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=()=>res();s.onerror=()=>{xlsxP=null;rej(new Error('xlsx'))};document.head.appendChild(s)}))}
 
 /* ---------- chrome: drawer, router, status ---------- */
-const TITLES={home:'סקירה',tx:'תנועות',budget:'תקציב',reports:'דוחות',bank:'בנק וכרטיס',msgs:'הודעות',album:'תמונות ורקע',import:'ייבוא מאקסל ושיטס',sync:'סנכרון משותף',backup:'גיבוי וייצוא',profile:'פרופיל והתקנה'};
+const TITLES={home:'סקירה',tx:'תנועות',budget:'תקציב',reports:'דוחות',bank:'בנק וכרטיס',settings:'הגדרות',msgs:'הודעות',album:'תמונות ורקע',import:'ייבוא מאקסל ושיטס',sync:'סנכרון משותף',backup:'גיבוי וייצוא',profile:'פרופיל והתקנה'};
 function openDrawer(){$('#drawer').classList.add('open');$('#scrim').hidden=false;$('#menuBtn').setAttribute('aria-expanded','true');setTimeout(()=>$('#drawer .menu a.on, #drawer .menu a')?.focus(),50)}
 function closeDrawer(){$('#drawer').classList.remove('open');$('#scrim').hidden=true;$('#menuBtn').setAttribute('aria-expanded','false')}
 function openSpeed(){$('#speed').hidden=false;$('#scrim2').hidden=false;$('#fab').setAttribute('aria-expanded','true')}
 function closeSpeed(){$('#speed').hidden=true;$('#scrim2').hidden=true;$('#fab').setAttribute('aria-expanded','false')}
 function route(){
-  const v=(location.hash||'#home').slice(1);ui.view=TITLES[v]?v:'home';
+  let v=(location.hash||'#home').slice(1);if(v==='profile')v='settings';ui.view=TITLES[v]?v:'home';
   $$('.view').forEach(s=>s.hidden=s.dataset.view!==ui.view);document.body.dataset.view=ui.view;$('#msgF').hidden=ui.view!=='msgs';
   $$('[data-nav]').forEach(a=>{const on=a.dataset.nav===ui.view;a.classList.toggle('on',on);if(on)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
   $('#vTitle').textContent=TITLES[ui.view];
@@ -558,7 +558,7 @@ function syncStatusHtml(){const pend=SY.dirty.length+SY.idirty.length+(SY.cfgDir
 function renderSync(){
   const b=$('#syncBody'),keep={},ae=document.activeElement,aid=ae&&b.contains(ae)?ae.id:'',selS=aid&&ae.selectionStart!=null?ae.selectionStart:null,selE=aid&&ae.selectionEnd!=null?ae.selectionEnd:null;
   ['wEm','wOn','wFreq','wDay','joinCode','joinMerge','gsUrl','ingTest'].forEach(id=>{const el=$('#'+id);if(el)keep[id]=el.type==='checkbox'?el.checked:el.value});
-  renderSyncInner(b);renderedSv=SY.sv;
+  renderSyncInner(b);renderedSv=SY.sv;if(ui.view==='settings')renderSetDyn();
   Object.keys(keep).forEach(id=>{const el=$('#'+id);if(!el)return;if(el.type==='checkbox'){if(!el.disabled)el.checked=keep[id]}else el.value=keep[id]});
   if(aid){const el=$('#'+aid);if(el){el.focus({preventScroll:true});try{if(selS!=null)el.setSelectionRange(selS,selE)}catch{}}}
 }
@@ -569,11 +569,7 @@ ${syncStatusHtml()}
 <p class="hint">כל שינוי שאתה עושה נשלח לגיליון, והאפליקציה בודקת עדכונים מהמכשירים האחרים כל 20 שניות. אפשר גם לערוך ישירות בגיליון, והשינויים יגיעו לאפליקציה.</p>
 <div class="btnrow"><button class="btn solid" data-act="sync-now">סנכרן עכשיו</button>${SY.sheet&&/^https:\/\//.test(SY.sheet)?`<a class="btn" href="${esc(SY.sheet)}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-sheet"/></svg>פתח את הגיליון</a>`:''}</div></div>
 ${updCard()}
-${SY.ro?`<div class="card"><h2>צפייה בלבד</h2><p class="hint" style="margin:0">המכשיר הזה מחובר עם קוד לצפייה. רואים את כל התנועות, הדוחות והתקציב, אבל אי אפשר להוסיף או לשנות. כדי לערוך, בקש מבעל החשבון קוד הצטרפות מלא.</p></div>`:`${weeklyCard()}
-${pushCard()}
-${autoCard()}
-${siriCard()}
-${widgetCard()}
+${SY.ro?`<div class="card"><h2>צפייה בלבד</h2><p class="hint" style="margin:0">המכשיר הזה מחובר עם קוד לצפייה. רואים את כל התנועות, הדוחות והתקציב, אבל אי אפשר להוסיף או לשנות. כדי לערוך, בקש מבעל החשבון קוד הצטרפות מלא.</p></div>`:`<div class="card"><p class="hint" style="margin:0">התראות, סיכום במייל, חיובים שנכנסים לבד, סירי והוידג׳ט נמצאים ב<a href="#settings">הגדרות</a>.</p></div>
 ${partnerCard()}`}
 <div class="card"><h2>ניתוק</h2><p class="hint">המכשיר יפסיק לסנכרן. הגיליון והמכשירים האחרים ממשיכים כרגיל. אם חיברת את החשבון בשביל מישהו אחר, בחר "נתק ומחק", ולא יישאר אצלך כלום מהנתונים שלהם.</p><div class="btnrow"><button class="btn sm" data-act="disconnect">נתק והשאר את הנתונים</button><button class="btn danger sm" data-act="disconnect-wipe">נתק ומחק מהמכשיר</button></div></div>`;
     return;
@@ -844,7 +840,7 @@ function doImport(){
 /* ---------- render all ---------- */
 function render(){
   chrome();
-  if(ui.view==='home')renderHome();else if(ui.view==='tx')renderTx();else if(ui.view==='budget')renderBudget();else if(ui.view==='sync')renderSync();else if(ui.view==='import')renderImport();else if(ui.view==='msgs')renderMsgs();else if(ui.view==='reports')renderReports();else if(ui.view==='bank')renderBank();else if(ui.view==='album')renderAlbum();else if(ui.view==='profile'){$('#pName').value=S.profile.name;$('#pMe').value=ui.me;renderLockCard()}
+  if(ui.view==='home')renderHome();else if(ui.view==='tx')renderTx();else if(ui.view==='budget')renderBudget();else if(ui.view==='sync')renderSync();else if(ui.view==='import')renderImport();else if(ui.view==='msgs')renderMsgs();else if(ui.view==='reports')renderReports();else if(ui.view==='bank')renderBank();else if(ui.view==='album')renderAlbum();else if(ui.view==='settings')renderSettings();
   if(ui.view!=='home')stopHomeAlbum();
   BG.apply();
 }
@@ -1483,7 +1479,7 @@ function pushCard(){
 ${box('tx','כשהשותף מוסיף הוצאה או הכנסה')}${box('msg','הודעה חדשה')}${box('budget','קטגוריה מתקרבת לתקציב או חורגת ממנו')}${box('rec','הוצאה או הכנסה קבועה נכנסה')}${box('bank','חיוב או זיכוי שנקלט אוטומטית מהבנק או מהאשראי')}
 <p class="err" id="pErr"></p>${action}</div>`;
 }
-$('#syncBody').addEventListener('change',async e=>{const k=e.target.dataset&&e.target.dataset.pp;if(!k)return;ui.push.prefs[k]=e.target.checked;persistNow();
+document.addEventListener('change',async e=>{const k=e.target.dataset&&e.target.dataset.pp;if(!k)return;ui.push.prefs[k]=e.target.checked;persistNow();
   if(ui.push.on&&SY.on){try{const r=await Sync.call({action:'push-prefs',dev:ui.dev,prefs:ui.push.prefs});toast(r.ok?'ההעדפות נשמרו':'לא הצלחתי לשמור, נסה שוב')}catch(err){toast(errText(err))}}});
 
 /* ---------- sync screen: script updates, Siri, widget, partner ---------- */
@@ -1672,10 +1668,7 @@ ${f?`<p class="fcbig${f.low?' bad':''}">${esc(fmt(f.a))} <small class="hint">ב�
 ${f.now?`<p class="hint">${f.low?`<b class="bad">צפוי חוסר: אחרי החיוב יישארו בערך ${esc(fmt(f.after))}.</b> כדאי להעביר כסף לחשבון לפני ה־${S.ex.bill}.`:`אחרי החיוב יישארו בבנק בערך ${esc(fmt(f.after))}.`}${f.inc?` כולל ${esc(fmt(f.inc))} הכנסות קבועות שצפויות עד אז.`:''} לא כולל הוצאות אחרות מהבנק שעוד יגיעו.</p>`:''}
 ${top.map(([k,v])=>`<div class="trow"><span>${esc(k)}</span><b>${esc(fmt(v))}</b></div>`).join('')}
 ${f.fut.length?`<div class="trow"><span>תשלומים מעסקאות קודמות<small>${f.fut.map(x=>esc(x.n+' '+x.k)).join(', ')}</small></span><b>${esc(fmt(sumBy(f.fut,x=>x.a)))}</b></div>`:''}`:'<p class="hint" style="margin:0">אין עדיין תנועות בכרטיס. הן מגיעות מייבוא פירוט max או מחיובים שנקלטים לבד.</p>'}
-<div class="gset" style="margin-top:12px"><label>יום החיוב בחודש<select class="field" id="exBill">${Array.from({length:28},(_,i)=>i+1).map(d=>`<option value="${d}"${d===ex.bill?' selected':''}>${d}</option>`).join('')}</select></label>
-<label>עסקאות עד יום<select class="field" id="exCut">${Array.from({length:28},(_,i)=>i+1).map(d=>`<option value="${d}"${d===ex.cut?' selected':''}>${d}</option>`).join('')}</select></label>
-<label>להתריע כשהיתרה תרד מתחת ל־<input class="field" id="exMin" type="number" inputmode="numeric" step="100" value="${ex.minBal}"></label></div>
-<p class="hint" style="margin:0">עסקה עד היום שבחרת נכנסת לחיוב של אותו חודש, ואחריו לחיוב של החודש הבא. ב־max זה בדרך כלל עד ה־7 לחודש. כשיש תאריך חיוב מהקובץ, הוא קובע.</p></div>
+<p class="hint" style="margin:12px 0 0">יום החיוב וההתראה לפני מינוס: <a href="#settings" data-sopen="s-bank">בהגדרות</a>.</p></div>
 <div class="card"><h2>תשלומים עתידיים</h2><p class="hint">עסקאות בתשלומים שעוד לא נגמרו, לפי החודש שבו הן יורדות.</p>
 ${byYm.size?[...byYm].slice(0,12).map(([ym,l])=>`<div class="trow"><span>${esc(MN[mIdx(ym)]+' '+ym.slice(0,4))}<small>${l.map(x=>esc(x.n+', '+x.k)).join(' · ')}</small></span><b>${esc(fmt(sumBy(l,x=>x.a)))}</b></div>`).join(''):'<p class="hint" style="margin:0">אין תשלומים פתוחים.</p>'}</div>
 <div class="card"><h2>מאיזה חשבון</h2><p class="hint">כדי לחשב יתרה, כל תנועה משויכת לכרטיס או לחשבון הבנק. ייבוא וקליטה אוטומטית משייכים לבד. בהוספה ידנית בוחרים "שולם מ־".</p>
@@ -1696,7 +1689,11 @@ ${r.cand.length?`<h3 class="h3">תנועות של בדיוק ${esc(fmt(Math.abs(
 <div class="btnrow"><button class="btn sm" data-act="bal-anchor" data-v="${v}">זה בסדר, קבע את היתרה הזו כנקודת התחלה</button></div>`;
   renderBank();hydrate($('#balRes'))};
 ACT['bal-anchor']=b=>{const v=+b.dataset.v;change(()=>{S.ex.bal={d:todayStr,v}},{cfg:true,undo:false});ui.balRes='';toast(`נקודת ההתחלה עודכנה ל־${fmt(v)} היום`);renderBank()};
-$('#bankBody').addEventListener('change',e=>{const id=e.target.id;if(id==='exBill'||id==='exCut'||id==='exMin'){const v=Math.round(+e.target.value||0);change(()=>{if(id==='exBill')S.ex.bill=clamp(v,1,28);else if(id==='exCut')S.ex.cut=clamp(v,1,28);else S.ex.minBal=v},{cfg:true,undo:false})}});
+function renderSetBank(){const ex=S.ex;$('#setBank').innerHTML=`<div class="gset"><label>יום החיוב בחודש<select class="field" id="exBill">${Array.from({length:28},(_,i)=>i+1).map(d=>`<option value="${d}"${d===ex.bill?' selected':''}>${d}</option>`).join('')}</select></label>
+<label>עסקאות עד יום<select class="field" id="exCut">${Array.from({length:28},(_,i)=>i+1).map(d=>`<option value="${d}"${d===ex.cut?' selected':''}>${d}</option>`).join('')}</select></label>
+<label>להתריע כשהיתרה תרד מתחת ל־<input class="field" id="exMin" type="number" inputmode="numeric" step="100" value="${ex.minBal}"></label></div>
+<p class="hint" style="margin:0">עסקה עד היום שבחרת נכנסת לחיוב של אותו חודש, ואחריו לחיוב של החודש הבא. ב־max זה בדרך כלל עד ה־7 לחודש. כשיש תאריך חיוב מהקובץ, הוא קובע.</p>`}
+document.addEventListener('change',e=>{const id=e.target.id;if(id==='exBill'||id==='exCut'||id==='exMin'){const v=Math.round(+e.target.value||0);change(()=>{if(id==='exBill')S.ex.bill=clamp(v,1,28);else if(id==='exCut')S.ex.cut=clamp(v,1,28);else S.ex.minBal=v},{cfg:true,undo:false})}});
 
 /* ---------- review inbox (auto-ingested) + rules ---------- */
 const rvList=()=>TX().filter(t=>t.x?.rv).sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0);
@@ -1737,8 +1734,7 @@ function renderRules(){
   const all=Object.entries(S.rules).filter(([k,c])=>cat(c)).sort((a,b)=>(cnt.get(b[0])||0)-(cnt.get(a[0])||0)||a[0].localeCompare(b[0],'he'));
   const list=all.filter(([k,c])=>!q||k.includes(q)||(cat(c)?.name||'').toLowerCase().includes(q)),lim=ui.ruleAll?list.length:30;
   const keepQ=document.activeElement?.id==='ruleQ';
-  el.innerHTML=`<div class="ch"><h2>כללים: בית עסק ← קטגוריה</h2><span class="hint" style="margin:0">${all.length} כללים</span></div>
-<p class="hint">האפליקציה לומדת מכל תיקון שלך. כאן רואים, משנים ומוחקים. הכללים חלים על הוספה ידנית, על ייבוא ועל חיובים שנקלטים לבד מההודעות. ההתאמה לפי שתי המילים הראשונות בשם.</p>
+  el.innerHTML=`<p class="hint">${all.length?all.length+' כללים. ':''}האפליקציה לומדת מכל תיקון שלך. כאן רואים, משנים ומוחקים. הכללים חלים על הוספה ידנית, על ייבוא ועל חיובים שנקלטים לבד מההודעות. ההתאמה לפי שתי המילים הראשונות בשם.</p>
 <div class="ruleadd"><input class="field" id="ruleN" maxlength="60" placeholder="שם בית העסק, למשל: שופרסל דיל" aria-label="שם בית העסק"><select class="field" id="ruleC" aria-label="קטגוריה">${catOpts(exps().find(c=>/שונות/.test(c.name))?.id)}</select><button class="btn solid sm" data-act="rule-add">הוסף כלל</button></div>
 ${all.length>8?`<input class="field" type="search" id="ruleQ" placeholder="חיפוש בכללים" value="${esc(ui.ruleQ||'')}" style="margin:10px 0 4px" aria-label="חיפוש בכללים">`:''}
 <div class="rules">${list.slice(0,lim).map(([k,c])=>`<div class="rr" data-rk="${esc(k)}"><span><b>${esc(k)}</b><small>${cnt.get(k)||0} תנועות</small></span><select class="field" data-rc aria-label="קטגוריה ל${esc(k)}">${catOpts(c)}</select><button class="icon" data-rdel aria-label="מחק כלל ${esc(k)}"><svg class="ic"><use href="#i-x"/></svg></button></div>`).join('')||'<p class="hint" style="margin:8px 0 0">עוד אין כללים. הם נוצרים כשאתה מתקן קטגוריה, או כאן.</p>'}</div>
@@ -1752,21 +1748,15 @@ $('#rulesCard').addEventListener('input',e=>{if(e.target.id==='ruleQ'){ui.ruleQ=
 $('#rulesCard').addEventListener('change',e=>{const s=e.target.closest('[data-rc]');if(!s)return;const k=s.closest('[data-rk]').dataset.rk;change(()=>{S.rules[k]=s.value},{cfg:true});const lm=applyAllOffer(k);toast(lm?lm.msg:'הכלל עודכן',!lm,lm?.act)});
 $('#rulesCard').addEventListener('click',e=>{const d=e.target.closest('[data-rdel]');if(!d)return;const k=d.closest('[data-rk]').dataset.rk;change(()=>{delete S.rules[k]},{cfg:true});toast(`הכלל "${k}" נמחק`,true)});
 
-/* ---------- quick add: "50 קפה" ---------- */
-function parseQuick(raw){let s=String(raw||'').replace(/[״”“]/g,'"').replace(/\s+/g,' ').trim().replace(/^(?:תוסיף|הוסף|תרשום|רשום)\s+/,'');
-  const m=s.match(/(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:[.,]\d{1,2})?)/);if(!m)return null;const a=num(m[1]);if(!(a>0))return null;
-  const ref=/^(?:זיכוי|החזר)(?=\s|$)/.test(s),inc=!ref&&/^(?:הכנסה|קיבלתי|נכנס(?:ו|ה)?|משכורת)(?=\s|$)|(?:^|\s)הכנסה(?=\s|$)/.test(s);
-  let d=todayStr;if(/(?:^|\s)אתמול(?=\s|$)/.test(s))d=ymd(new Date(T0.getFullYear(),T0.getMonth(),T0.getDate()-1));
-  const n=(s.slice(0,m.index)+' '+s.slice(m.index+m[0].length)).replace(/₪|ש"ח|שח(?=\s|$)|שקלים|שקל/g,' ').replace(/(?:^|\s)(?:היום|אתמול)(?=\s|$)/g,' ').replace(/\s+/g,' ').trim()
-    .replace(/^(?:(?:הוצאה|הכנסה|זיכוי|החזר|קיבלתי|שילמתי|הוצאתי|על|ב|של|עבור|ל|מ|ב-|ל-|מ-)\s+)+/,'').replace(/\s+(?:על|ב|של|עבור)$/,'').trim().slice(0,60);
-  return {a:Math.round(a*100)/100,t:inc||ref?'inc':'exp',ref,n,d}}
-function quickCat(p){const grp=p.t==='inc'&&!p.ref?incs():exps(),rid_=S.rules[mkey(p.n)];if(rid_&&grp.some(c=>c.id===rid_))return {c:rid_,sure:true};
-  const nm=p.n?ruleName(p.n):'',hit=nm&&grp.find(c=>c.name===nm);if(hit)return {c:hit.id,sure:true};
-  const fb=grp.find(c=>/שונות|אחרת/.test(c.name)&&!c.sav)||grp.find(c=>!c.sav)||grp[0];return {c:fb.id,sure:false}}
-$('#qaF').addEventListener('submit',e=>{e.preventDefault();const v=$('#qaIn').value,p=parseQuick(v);if(!p){toast('כתוב סכום ותיאור, למשל: 50 קפה');$('#qaIn').focus();return}
-  const q=quickCat(p),id=rid(),c=cat(q.c);
-  change(()=>{const t={id,d:p.d,t:p.t,a:p.a,c:q.c,n:p.n||c?.name||'',img:'',u:0};if(!q.sure)t.x={rv:1};if(ui.lastAc)t.x={...(t.x||{}),ac:ui.lastAc};S.tx.push(t)},{tx:[id]});
-  $('#qaIn').value='';toast(`${p.ref?'זיכוי':p.t==='inc'?'הכנסה':'הוצאה'} של ${fmt(p.a)}${p.n?': '+p.n:''} ← ${c?.name||''}${q.sure?'':'. לא הייתי בטוח בקטגוריה, זה מחכה ב"לבדיקה"'}`,true)});
+/* ---------- settings screen ---------- */
+function cardBody(html){const d=document.createElement('div');d.innerHTML=html;const c=d.firstElementChild;if(!c)return '';c.querySelector('h2')?.remove();return c.innerHTML}
+const NOSYNC='<p class="hint" style="margin:0">עובד אחרי שמחברים גיליון ב<a href="#sync">סנכרון משותף</a>.</p>';
+function renderSetDyn(){const keep={},ae=document.activeElement,aid=ae?.id;['wEm','wOn','wFreq','wDay','ingTest'].forEach(id=>{const el=$('#'+id);if(el)keep[id]=el.type==='checkbox'?el.checked:el.value});
+  const F={push:pushCard,mail:weeklyCard,auto:autoCard,siri:siriCard,widget:widgetCard};
+  $$('[data-sdyn]').forEach(el=>{el.innerHTML=!SY.on?NOSYNC:SY.ro?'<p class="hint" style="margin:0">לא זמין בחשבון לצפייה בלבד.</p>':cardBody(F[el.dataset.sdyn]())});
+  Object.keys(keep).forEach(id=>{const el=$('#'+id);if(el){if(el.type==='checkbox')el.checked=keep[id];else el.value=keep[id]}});if(aid)$('#'+aid)?.focus({preventScroll:true})}
+function renderSettings(){$('#pName').value=S.profile.name;$('#pMe').value=ui.me;renderBudget();renderSetBank();renderLockCard();renderSetDyn()}
+document.addEventListener('click',e=>{const a=e.target.closest('[data-sopen]');if(!a)return;const id=a.dataset.sopen;setTimeout(()=>{const d=$('#'+id);if(d){d.open=true;d.scrollIntoView({block:'start'})}},60)});
 
 /* ---------- app lock: Face ID / Touch ID + code, per device ---------- */
 const LOCK={k:'kesef-lock',c:null,locked:false,hid:0,
@@ -1787,7 +1777,7 @@ $('#lockForgot').addEventListener('click',async()=>{if(!(await ask('לאפס א�
 document.addEventListener('visibilitychange',()=>{if(!LOCK.on())return;if(document.visibilityState!=='visible'){LOCK.hid=Date.now();if(!(+LOCK.c.d))LOCK.show()}else if(!LOCK.locked&&Date.now()-LOCK.hid>(+LOCK.c.d||0)*60000)LOCK.show()});
 async function renderLockCard(){const el=$('#lockCard');if(!el)return;const bio=await LOCK.bioOk(),on=LOCK.on(),d=+(LOCK.c?.d||0);
   const delay=`<label class="lbl" for="lkD" style="display:block;margin-top:10px">לנעול</label><select class="field" id="lkD">${[[0,'מיד כשיוצאים מהאפליקציה'],[1,'אחרי דקה'],[5,'אחרי 5 דקות'],[15,'אחרי רבע שעה']].map(([v,l])=>`<option value="${v}"${v===d?' selected':''}>${l}</option>`).join('')}</select>`;
-  el.innerHTML=`<h2><svg class="ic" style="vertical-align:-4px"><use href="#i-lock"/></svg> נעילה</h2><p class="hint">מי שמחזיק את הטלפון לא יראה את הנתונים בלי ${bio?'Face ID, טביעת אצבע או ':''}קוד. ההגדרה רק למכשיר הזה. זו נעילת מסך: הנתונים עצמם שמורים במכשיר ובגיליון כרגיל.</p>
+  el.innerHTML=`<p class="hint">מי שמחזיק את הטלפון לא יראה את הנתונים בלי ${bio?'Face ID, טביעת אצבע או ':''}קוד. ההגדרה רק למכשיר הזה. זו נעילת מסך: הנתונים עצמם שמורים במכשיר ובגיליון כרגיל.</p>
 ${on?`<p class="okt" style="margin:0">הנעילה פעילה${LOCK.c.cred?', עם '+(PUSH.ios()?'Face ID':'זיהוי ביומטרי'):''}</p>${delay}<div class="btnrow"><button class="btn sm" data-act="lk-now">נעל עכשיו</button><button class="btn danger sm" data-act="lk-off">כבה נעילה</button></div>`
 :`<div class="row2"><label>קוד (4 עד 8 ספרות)<input class="field" id="lkP1" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></label><label>שוב, לאימות<input class="field" id="lkP2" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></label></div>
 ${bio?'<label class="chk"><input type="checkbox" id="lkBio" checked>לפתוח גם עם Face ID או טביעת אצבע</label>':'<p class="hint" style="margin:8px 0 0">במכשיר או בדפדפן הזה אין זיהוי ביומטרי לאתרים, אז הנעילה תהיה עם קוד.</p>'}${delay}

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=13">
+<link rel="stylesheet" href="app.css?v=14">
 </head>
 <body>
 <div class="bgfx" id="bgfx" aria-hidden="true"><div class="bgl"></div><div class="bgl"></div><div class="bgveil"></div></div>
@@ -50,19 +50,20 @@
   <symbol id="i-sheet" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 10h16M4 15h16M10 4v16"/></symbol>
   <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
   <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
 </defs></svg>
 
 <aside class="drawer" id="drawer" aria-label="תפריט">
   <div class="dtop">
-    <a class="avatar" href="#profile" id="dAvatar" aria-label="פרופיל"><img alt="" hidden><span>₪</span></a>
+    <a class="avatar" href="#settings" id="dAvatar" aria-label="פרופיל"><img alt="" hidden><span>₪</span></a>
     <div class="who"><b id="hhName">הכסף שלי</b><small id="dSync">שמור במכשיר הזה</small></div>
     <button class="icon dclose" id="dClose" aria-label="סגירת התפריט"><svg class="ic"><use href="#i-x"/></svg></button>
   </div>
   <nav class="menu">
     <a href="#home" data-nav="home"><svg class="ic"><use href="#i-home"/></svg>סקירה</a>
     <a href="#tx" data-nav="tx"><svg class="ic"><use href="#i-list"/></svg>תנועות</a>
-    <a href="#budget" data-nav="budget"><svg class="ic"><use href="#i-pie"/></svg>תקציב ויעד חיסכון</a>
+    <a href="#budget" data-nav="budget"><svg class="ic"><use href="#i-pie"/></svg>תקציב</a>
     <a href="#reports" data-nav="reports"><svg class="ic"><use href="#i-chart"/></svg>דוחות ומגמות</a>
     <a href="#bank" data-nav="bank"><svg class="ic"><use href="#i-wallet"/></svg>בנק וכרטיס</a>
     <a href="#msgs" data-nav="msgs"><svg class="ic"><use href="#i-chat"/></svg>הודעות<span class="cnt" data-unread hidden></span></a>
@@ -71,7 +72,7 @@
     <a href="#import" data-nav="import"><svg class="ic"><use href="#i-import"/></svg>ייבוא מאקסל ושיטס</a>
     <a href="#sync" data-nav="sync"><svg class="ic"><use href="#i-sync"/></svg>סנכרון משותף<span class="mbadge" id="mSync"></span></a>
     <a href="#backup" data-nav="backup"><svg class="ic"><use href="#i-box"/></svg>גיבוי וייצוא</a>
-    <a href="#profile" data-nav="profile"><svg class="ic"><use href="#i-user"/></svg>פרופיל והתקנה</a>
+    <a href="#settings" data-nav="settings"><svg class="ic"><use href="#i-gear"/></svg>הגדרות</a>
   </nav>
   <p class="dnote">הנתונים נשמרים במכשיר שלך. כשמפעילים סנכרון הם נשמרים גם בגיליון גוגל שלך, ולא בשום מקום אחר.</p>
 </aside>
@@ -92,7 +93,7 @@
 
   <section class="view" data-view="home">
     <div class="hero" id="hero"><div class="herobg" id="herobg" aria-hidden="true"><div class="bgl"></div><div class="bgl"></div></div><div class="in">
-      <a class="hname" id="hName" href="#profile"></a>
+      <a class="hname" id="hName" href="#settings"></a>
       <p class="big" id="big"></p>
       <p class="sub" id="sub"></p>
       <p class="fc" id="fc" hidden></p>
@@ -102,7 +103,6 @@
         <button class="btn" data-act="exp">+ הוצאה</button>
         <button class="btn" data-act="inc">+ הכנסה</button>
       </div>
-      <form class="qa" id="qaF"><input class="field" id="qaIn" maxlength="80" autocomplete="off" placeholder="הוספה מהירה, למשל: 50 קפה" aria-label="הוספה מהירה: סכום ותיאור"><button class="btn" type="submit">הוסף</button></form>
     </div></div>
     <div class="pad grid2">
       <div class="note span2" id="noteHome" hidden><span>אלה נתוני דוגמה כדי לראות איך זה עובד. אפשר לערוך אותם או להתחיל מאפס.</span><button class="btn sm" data-act="fresh">התחל טבלה ריקה</button></div>
@@ -112,11 +112,11 @@
       <div class="card" id="homeFc" hidden></div>
       <div class="card" id="homeCard" hidden></div>
       <div class="card" id="alerts">
-        <div class="ch"><h2>התראות</h2><a href="#budget" class="lnk">הגדרות</a></div>
+        <div class="ch"><h2>התראות</h2><a href="#settings" data-sopen="s-goal" class="lnk">הגדרות</a></div>
         <ul class="al" id="alList"></ul>
       </div>
       <div class="card">
-        <div class="ch"><h2>יעד חיסכון</h2><a href="#budget" class="lnk">שינוי היעד</a></div>
+        <div class="ch"><h2>יעד חיסכון</h2><a href="#settings" data-sopen="s-goal" class="lnk">שינוי היעד</a></div>
         <div class="gnum"><b id="gSaved"></b><span id="gOf"></span></div>
         <div class="gtr" id="gTr" role="img"><b id="gBar"></b><i id="gPot"></i></div>
         <p class="gnote" id="gNote"></p>
@@ -182,25 +182,6 @@
 
   <section class="view" data-view="budget" hidden>
     <div class="pad grid2">
-      <div class="card">
-        <h2>יעד והתראות</h2>
-        <div class="gset">
-          <label>יעד חיסכון חודשי בש״ח<input class="field" id="goalIn" type="number" min="0" step="50" inputmode="numeric"></label>
-          <label>להתריע מ־% מהתקציב<input class="field" id="apIn" type="number" min="50" max="100" step="5" inputmode="numeric"></label>
-        </div>
-        <p class="hint">החיסכון נספר מתוך הקטגוריה "חיסכון והשקעות". התראה קופצת כשקטגוריה מגיעה לאחוז הזה מהתקציב שלה, וכשהיא חורגת.</p>
-      </div>
-      <div class="card">
-        <h2>הכנסות</h2>
-        <p class="hint">הכנסה מסומנת נספרת כמשכורת שממנה נגזר התקציב.</p>
-        <div class="sheet"><table class="set"><thead><tr><th>צבע</th><th>הכנסה</th><th>סוג</th><th>נכנסת לחלוקה</th><th></th></tr></thead><tbody id="setI"></tbody></table></div>
-        <div class="srow"><span></span><button class="btn sm" id="addI">+ קטגוריית הכנסה</button></div>
-      </div>
-      <div class="card span2">
-        <div class="ch"><h2>הוצאות והכנסות קבועות</h2><button class="btn solid sm" id="recAdd"><svg class="ic"><use href="#i-plus"/></svg>הוספה</button></div>
-        <p class="hint">שכר דירה, סלולר, ביטוח, מנויים או משכורת קבועה. הן נכנסות לבד בכל חודש ביום שבחרת, ונכללות בצפי לסוף החודש.</p>
-        <div id="recList"></div>
-      </div>
       <div class="card span2">
         <h2>חלוקת המשכורת</h2>
         <p class="hint" id="pctSum"></p>
@@ -208,12 +189,10 @@
         <div class="srow"><span></span><button class="btn sm" id="addE">+ קטגוריית הוצאה</button></div>
       </div>
       <div class="card span2">
-        <h2>העברות בין החשבונות שלך</h2>
-        <p class="hint">כסף שעובר מחשבון שלך לחשבון אחר שלך, לכרטיס נטען או לארנק. לא נספר בהכנסות ובהוצאות. "חיסכון והשקעות" נספר כחיסכון, ומשיכה ממנו מקטינה אותו. אפשר לשנות לכל קטגוריה את הסוג.</p>
-        <div class="sheet"><table class="set"><thead><tr><th>צבע</th><th>שם</th><th>סוג</th><th style="text-align:end">יצא החודש</th><th style="text-align:end">נכנס החודש</th><th></th></tr></thead><tbody id="setT"></tbody></table></div>
-        <div class="srow"><span></span><button class="btn sm" id="addT">+ קטגוריית העברה</button></div>
+        <div class="ch"><h2>הוצאות והכנסות קבועות</h2><button class="btn solid sm" id="recAdd"><svg class="ic"><use href="#i-plus"/></svg>הוספה</button></div>
+        <p class="hint">שכר דירה, סלולר, ביטוח, מנויים או משכורת קבועה. הן נכנסות לבד בכל חודש ביום שבחרת, ונכללות בצפי לסוף החודש.</p>
+        <div id="recList"></div>
       </div>
-      <div class="card span2" id="rulesCard"></div>
     </div>
   </section>
 
@@ -301,10 +280,10 @@
     </div>
   </section>
 
-  <section class="view" data-view="profile" hidden>
-    <div class="pad grid2">
-      <div class="card">
-        <h2>פרופיל</h2>
+  <section class="view" data-view="settings" hidden>
+    <div class="pad stack setl">
+      <details class="card ssec" id="s-prof"><summary><span><b>פרופיל</b><small>שם החשבון, השם שלך ותמונה</small></span></summary>
+        <div class="ssb">
         <div class="prof">
           <button class="avatar" id="pAvatar" aria-label="החלפת תמונה"><img alt="" hidden><span>₪</span></button>
           <div class="btnrow" style="margin:0"><button class="btn sm" id="pPhoto">בחר תמונה</button><button class="btn sm danger" id="pPhotoDel" hidden>הסר</button></div>
@@ -317,8 +296,44 @@
         <input class="field" id="pMe" maxlength="40" placeholder="למשל: טליה">
         <p class="hint" style="margin-top:8px">מופיע ליד ההודעות והתמונות שאתה מוסיף. תמונת הפרופיל נשמרת רק במכשיר הזה.</p>
       </div>
-      <div class="card">
-        <h2>התקנה כאפליקציה</h2>
+      </details>
+      <details class="card ssec" id="s-goal"><summary><span><b>יעד חיסכון והתראות</b><small>יעד חודשי ומתי להתריע על תקציב</small></span></summary>
+        <div class="ssb">
+        <div class="gset">
+          <label>יעד חיסכון חודשי בש״ח<input class="field" id="goalIn" type="number" min="0" step="50" inputmode="numeric"></label>
+          <label>להתריע מ־% מהתקציב<input class="field" id="apIn" type="number" min="50" max="100" step="5" inputmode="numeric"></label>
+        </div>
+        <p class="hint">החיסכון נספר מתוך הקטגוריה "חיסכון והשקעות". התראה קופצת כשקטגוריה מגיעה לאחוז הזה מהתקציב שלה, וכשהיא חורגת.</p>
+      </div>
+      </details>
+      <details class="card ssec" id="s-inc"><summary><span><b>קטגוריות הכנסה</b><small>איזו הכנסה נכנסת לחלוקת המשכורת</small></span></summary>
+        <div class="ssb">
+        <p class="hint">הכנסה מסומנת נספרת כמשכורת שממנה נגזר התקציב.</p>
+        <div class="sheet"><table class="set"><thead><tr><th>צבע</th><th>הכנסה</th><th>סוג</th><th>נכנסת לחלוקה</th><th></th></tr></thead><tbody id="setI"></tbody></table></div>
+        <div class="srow"><span></span><button class="btn sm" id="addI">+ קטגוריית הכנסה</button></div>
+      </div>
+      </details>
+      <details class="card ssec" id="s-trf"><summary><span><b>העברות בין החשבונות שלך</b><small>מה לא נספר בהכנסות ובהוצאות</small></span></summary>
+        <div class="ssb">
+        <p class="hint">כסף שעובר מחשבון שלך לחשבון אחר שלך, לכרטיס נטען או לארנק. לא נספר בהכנסות ובהוצאות. "חיסכון והשקעות" נספר כחיסכון, ומשיכה ממנו מקטינה אותו. אפשר לשנות לכל קטגוריה את הסוג.</p>
+        <div class="sheet"><table class="set"><thead><tr><th>צבע</th><th>שם</th><th>סוג</th><th style="text-align:end">יצא החודש</th><th style="text-align:end">נכנס החודש</th><th></th></tr></thead><tbody id="setT"></tbody></table></div>
+        <div class="srow"><span></span><button class="btn sm" id="addT">+ קטגוריית העברה</button></div>
+      </div>
+      </details>
+      <details class="card ssec" id="s-rules"><summary><span><b>כללי קטגוריות</b><small>איזה בית עסק הולך לאיזו קטגוריה</small></span></summary>
+        <div class="ssb" id="rulesCard"></div>
+      </details>
+      <details class="card ssec" id="s-bank"><summary><span><b>כרטיס אשראי</b><small>יום החיוב והתראה לפני מינוס</small></span></summary>
+        <div class="ssb" id="setBank"></div>
+      </details>
+      <details class="card ssec" id="s-push"><summary><span><b>התראות בטלפון</b><small>מה להודיע ומתי</small></span></summary><div class="ssb" data-sdyn="push"></div></details>
+      <details class="card ssec" id="s-mail"><summary><span><b>סיכום במייל</b><small>חודשי או שבועי</small></span></summary><div class="ssb" data-sdyn="mail"></div></details>
+      <details class="card ssec" id="s-auto"><summary><span><b>חיובים נכנסים לבד</b><small>הודעות מהבנק ומהאשראי</small></span></summary><div class="ssb" data-sdyn="auto"></div></details>
+      <details class="card ssec" id="s-siri"><summary><span><b>הוספה בקול עם סירי</b><small>"היי סירי, הוסף הוצאה"</small></span></summary><div class="ssb" data-sdyn="siri"></div></details>
+      <details class="card ssec" id="s-widget"><summary><span><b>וידג׳ט למסך הבית</b><small>"נשארו לך" על מסך הבית</small></span></summary><div class="ssb" data-sdyn="widget"></div></details>
+      <details class="card ssec" id="s-lock"><summary><span><b>נעילה</b><small>Face ID או קוד</small></span></summary><div class="ssb" id="lockCard"></div></details>
+      <details class="card ssec" id="s-inst"><summary><span><b>התקנה כאפליקציה</b><small>אייפון, אנדרואיד ומחשב</small></span></summary>
+        <div class="ssb">
         <ol class="steps">
           <li><div><b>אייפון</b><p>פותחים את הכתובת ב־Safari, לוחצים על כפתור השיתוף ובוחרים "הוסף למסך הבית".</p></div></li>
           <li><div><b>אנדרואיד</b><p>פותחים ב־Chrome, תפריט שלוש הנקודות, "התקן אפליקציה" או "הוסף למסך הבית".</p></div></li>
@@ -326,13 +341,14 @@
         </ol>
         <p class="hint">פותחים תמיד מהאייקון. האפליקציה עובדת גם בלי אינטרנט, והנתונים לא נמחקים.</p>
       </div>
-      <div class="card" id="lockCard"></div>
-      <div class="card span2">
-        <h2>איפוס</h2>
+      </details>
+      <details class="card ssec" id="s-reset"><summary><span><b>איפוס</b><small>מחיקת תנועות או כל הנתונים</small></span></summary>
+        <div class="ssb">
         <p class="hint">מחיקת כל התנועות והחזרת הקטגוריות לברירת המחדל. אם הסנכרון פעיל, זה מוחק גם מהגיליון המשותף.</p>
         <div class="btnrow"><button class="btn danger sm" data-act="wipe-tx">מחק רק את התנועות</button><button class="btn danger sm" data-act="wipe">מחק את כל הנתונים</button></div>
         <p class="hint">"מחק רק את התנועות" משאיר את הקטגוריות, התקציבים, הקבועות ומה שהאפליקציה למדה מהתיקונים שלך.</p>
       </div>
+      </details>
     </div>
   </section>
 </div>
@@ -479,6 +495,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=24"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>
