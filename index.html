@@ -304,7 +304,8 @@
       <div class="card span2">
         <h2>איפוס</h2>
         <p class="hint">מחיקת כל התנועות והחזרת הקטגוריות לברירת המחדל. אם הסנכרון פעיל, זה מוחק גם מהגיליון המשותף.</p>
-        <button class="btn danger sm" data-act="wipe">מחק את כל הנתונים</button>
+        <div class="btnrow"><button class="btn danger sm" data-act="wipe-tx">מחק רק את התנועות</button><button class="btn danger sm" data-act="wipe">מחק את כל הנתונים</button></div>
+        <p class="hint">"מחק רק את התנועות" משאיר את הקטגוריות, התקציבים, הקבועות ומה שהאפליקציה למדה מהתיקונים שלך.</p>
       </div>
     </div>
   </section>
@@ -431,6 +432,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=22"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>

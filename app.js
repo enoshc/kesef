@@ -725,6 +725,9 @@ const ACT={
   photo:()=>{$('#txFile').dataset.picking='1';openTx({type:'exp'});$('#txFile').click()},
   undo,
   fresh:async()=>{if(!(await ask('להתחיל טבלה ריקה?','נתוני הדוגמה יימחקו והקטגוריות יחזרו לברירת המחדל.','התחל מאפס')))return;pushHist();replaceAll(blank());toast('הטבלה ריקה ומוכנה',true)},
+  'wipe-tx':async()=>{const ids=TX().map(t=>t.id);if(!ids.length){toast('אין תנועות למחוק');return}
+    if(!(await ask(`למחוק ${ids.length} תנועות?`,(SY.on?'הן יימחקו מהמכשיר ומהגיליון המשותף, אצל כל המחוברים. ':'')+'הקטגוריות, התקציבים והקבועות נשארים. אפשר לבטל מיד אחרי.','מחק תנועות',true)))return;
+    change(()=>ids.forEach(removeTx),{tx:ids});toast(`נמחקו ${ids.length} תנועות. עכשיו אפשר לייבא מחדש`,true)},
   wipe:async()=>{if(!(await ask('למחוק את כל הנתונים?',SY.on?'כל התנועות יימחקו מהמכשיר ומהגיליון המשותף, אצל כל המחוברים. אפשר לבטל מיד אחרי.':'כל התנועות יימחקו מהמכשיר. אפשר לבטל מיד אחרי.','מחק הכול',true)))return;pushHist();replaceAll({...blank(),profile:S.profile});toast('כל הנתונים נמחקו',true)},
   'sync-now':()=>Sync.run(true),
   'copy-code':()=>copyText(inviteCode(),'קוד ההצטרפות הועתק','קוד הצטרפות'),
