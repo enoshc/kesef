@@ -634,8 +634,8 @@ function doImport(){
   const ids=[];const usedNew=new Set(good.map(r=>r.c));
   change(()=>{P.newCats.filter(c=>usedNew.has(c.id)).forEach(c=>S.cats.push(normCat(c)));good.forEach(r=>{const id=rid();ids.push(id);S.tx.push({id,d:r.d,t:r.t,a:r.a,c:r.c,n:r.n,img:'',u:0,...(r.o?{note:r.o}:{})})})},{tx:ids,cfg:true});
   IMP.aoa=[];IMP.parsed=null;$('#impFile').value='';
-  const months=[...new Set(good.map(r=>r.d.slice(0,7)))].sort();ui.scope='all';ui.cur=months[months.length-1]||ui.cur;
-  location.hash='#tx';toast(`יובאו ${good.length} תנועות`,true);
+  ui.cur=nowYm;ui.scope='month';const inNow=good.filter(r=>r.d.slice(0,7)===nowYm).length;
+  location.hash='#tx';toast(`יובאו ${good.length} תנועות${inNow!==good.length?`, ${inNow} מהן החודש`:''}`,false,inNow!==good.length?{label:'הצג את כולן',fn:()=>{ui.scope='all';renderTx()}}:null);
 }
 
 /* ---------- render all ---------- */
@@ -1124,7 +1124,15 @@ load();runRec(true);route();loadAvatar();resetIdle();
 if(SY.on){setSync('ok');Sync.run(true)}
 setInterval(()=>{if(SY.on&&document.visibilityState==='visible')Sync.run()},20000);
 setInterval(()=>{if(SY.on)chrome()},30000);
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&SY.on)Sync.run();else persistNow()});
+let hiddenAt=0;
+function backToNow(){ui.cur=nowYm;ui.scope='month';ui.tagF='';ui.q='';ui.catF='';ui.typeF='all';const q=$('#q');if(q)q.value=''}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible'){hiddenAt=Date.now();persistNow();return}
+  const newDay=new Date().toDateString()!==T0.toDateString();
+  if(hiddenAt&&(newDay||Date.now()-hiddenAt>10*60e3)&&!$$('dialog').some(d=>d.open)){persistNow();location.reload();return}
+  if(SY.on)Sync.run();
+});
+window.addEventListener('pageshow',e=>{if(e.persisted){backToNow();render()}});
 window.addEventListener('online',()=>{if(SY.on)Sync.run()});
 window.addEventListener('offline',()=>{if(SY.on)setSync('offline')});
 try{navigator.storage?.persist?.()}catch{}
