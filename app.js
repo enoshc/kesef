@@ -496,7 +496,9 @@ function renderBudget(){
 
 /* ---------- render: sync ---------- */
 let GS='';
-fetch('apps-script.gs',{cache:'no-cache'}).then(r=>r.ok?r.text():'').then(t=>{GS=t}).catch(()=>{});
+const GS_SRC=['https://raw.githubusercontent.com/enoshc/kesef/main/apps-script.gs?t=','apps-script.gs?t='];
+async function loadGS(){for(const u of GS_SRC){try{const r=await fetch(u+Date.now(),{cache:'no-store'});if(r.ok){const t=await r.text();if(/var VERSION = \d+/.test(t)){GS=t;return t}}}catch{}}return GS}
+loadGS();
 function syncStatusHtml(){const pend=SY.dirty.length+SY.idirty.length+(SY.cfgDirty?1:0),bad=syncState==='err';
   return `<div class="status${bad?' err':''}" id="syncStat"><svg class="ic"><use href="#i-${bad?'alert':'check'}"/></svg><div><b>${bad?'הסנכרון נכשל':syncState==='busy'?'מסנכרן…':'מחובר לגיליון משותף'}</b><small>${esc(bad?SY.err:`עודכן ${agoText(SY.last)}${pend?`, ${pend} שינויים מחכים`:''}`)}</small></div></div>`}
 function renderSync(){
@@ -512,7 +514,7 @@ function renderSyncInner(b){
 ${syncStatusHtml()}
 <p class="hint">כל שינוי שאתה עושה נשלח לגיליון, והאפליקציה בודקת עדכונים מהמכשירים האחרים כל 20 שניות. אפשר גם לערוך ישירות בגיליון, והשינויים יגיעו לאפליקציה.</p>
 <div class="btnrow"><button class="btn solid" data-act="sync-now">סנכרן עכשיו</button>${SY.sheet&&/^https:\/\//.test(SY.sheet)?`<a class="btn" href="${esc(SY.sheet)}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-sheet"/></svg>פתח את הגיליון</a>`:''}</div></div>
-${SY.sv&&SY.sv<9?`<div class="card"><h2>עדכון הסקריפט בגיליון</h2><p class="hint">יש גרסה חדשה של הסקריפט, עם ${[SY.sv<3?'תמונות והודעות':'',SY.sv<4?'הערות':'',SY.sv<5?'תגיות':'',SY.sv<7?'סיכום חודשי ושבועי במייל':'',SY.sv<8?'התראות בטלפון':'','קליטה אוטומטית של חיובים מהודעות הבנק והאשראי'].filter(Boolean).join(', ')}. עד שתעדכן, הן נשמרות רק במכשיר ויישלחו אחרי העדכון. מעדכנים פעם אחת, ממכשיר אחד:</p><ol class="steps"><li><div><b>פותחים את עורך הסקריפטים</b><p>בגיליון: <kbd>Extensions</kbd> ← <kbd>Apps Script</kbd>.</p></div></li><li><div><b>מחליפים את הקוד</b><p>מוחקים את כל הקוד הישן, מדביקים את החדש ושומרים.</p><button class="btn solid sm" data-act="copy-gs">העתק את הקוד החדש</button></div></li><li><div><b>מאשרים שליחת מיילים</b><p>למעלה בעורך, בתפריט שליד <kbd>Debug</kbd> בוחרים את הפונקציה <kbd>authorize</kbd> ולוחצים <kbd>Run</kbd>. מאשרים את ההרשאות כמו בפעם הראשונה.</p></div></li><li><div><b>מפרסמים גרסה חדשה</b><p><kbd>Deploy</kbd> ← <kbd>Manage deployments</kbd> ← סמל העיפרון ← ב־<kbd>Version</kbd> בוחרים <kbd>New version</kbd> ← <kbd>Deploy</kbd>. הכתובת לא משתנה ואין צורך לחבר מחדש.</p></div></li></ol><button class="btn sm" data-act="sync-now">בדוק שוב</button></div>`:''}
+${SY.sv&&SY.sv<10?`<div class="card"><h2>עדכון הסקריפט בגיליון</h2><p class="hint">יש גרסה חדשה של הסקריפט, עם ${[SY.sv<3?'תמונות והודעות':'',SY.sv<4?'הערות':'',SY.sv<5?'תגיות':'',SY.sv<7?'סיכום חודשי ושבועי במייל':'',SY.sv<8?'התראות בטלפון':'',SY.sv<9?'קליטה אוטומטית של חיובים מהודעות הבנק והאשראי':'זיהוי מדויק יותר של שם בית העסק בהודעות'].filter(Boolean).join(', ')}. עד שתעדכן, הן נשמרות רק במכשיר ויישלחו אחרי העדכון. מעדכנים פעם אחת, ממכשיר אחד:</p><ol class="steps"><li><div><b>פותחים את עורך הסקריפטים</b><p>בגיליון: <kbd>Extensions</kbd> ← <kbd>Apps Script</kbd>.</p></div></li><li><div><b>מחליפים את הקוד</b><p>מוחקים את כל הקוד הישן, מדביקים את החדש ושומרים.</p><button class="btn solid sm" data-act="copy-gs">העתק את הקוד החדש</button></div></li><li><div><b>מאשרים שליחת מיילים</b><p>למעלה בעורך, בתפריט שליד <kbd>Debug</kbd> בוחרים את הפונקציה <kbd>authorize</kbd> ולוחצים <kbd>Run</kbd>. מאשרים את ההרשאות כמו בפעם הראשונה.</p></div></li><li><div><b>מפרסמים גרסה חדשה</b><p><kbd>Deploy</kbd> ← <kbd>Manage deployments</kbd> ← סמל העיפרון ← ב־<kbd>Version</kbd> בוחרים <kbd>New version</kbd> ← <kbd>Deploy</kbd>. הכתובת לא משתנה ואין צורך לחבר מחדש.</p></div></li></ol><button class="btn sm" data-act="sync-now">בדוק שוב</button></div>`:''}
 ${weeklyCard()}
 ${pushCard()}
 ${autoCard()}
@@ -740,8 +742,8 @@ const ACT={
   'ing-copy-and':()=>copyText(JSON.stringify({action:'ingest',tok:ING.tok,text:'[sms_message]',src:'SMS'}),'גוף הבקשה למקרודרויד הועתק','גוף הבקשה'),
   'ing-test':async(btn)=>{const text=$('#ingTest').value.trim();if(!text){toast('הדבק קודם הודעה מהבנק או מחברת האשראי');return}btn.disabled=true;
     try{const r=await Sync.call({action:'ing-test',text});if(!r.ok)throw new Error(r.err||'err');ING.res=r;renderSync()}catch(e){toast(errText(e))}finally{btn.disabled=false}},
-  'copy-gs':()=>{if(!GS){toast('הקוד עוד לא נטען, נסה שוב בעוד רגע');return}copyText(GS,'הקוד הועתק. הדבק אותו בעורך של Apps Script','קוד הסקריפט')},
-  'show-gs':()=>{if(GS)showText('קוד הסקריפט','מעתיקים את כל הטקסט ומדביקים בעורך של Apps Script.',GS)},
+  'copy-gs':async()=>{await loadGS();if(!GS){toast('הקוד עוד לא נטען, בדוק חיבור לאינטרנט ונסה שוב');return}copyText(GS,'הקוד הועתק. הדבק אותו בעורך של Apps Script','קוד הסקריפט')},
+  'show-gs':async()=>{await loadGS();if(GS)showText('קוד הסקריפט','מעתיקים את כל הטקסט ומדביקים בעורך של Apps Script.',GS)},
   connect:async(btn)=>{const url=$('#gsUrl').value.trim(),er=$('#gsErr');er.textContent='';try{sessionStorage.setItem('kesef-url',url)}catch{}
     const pr=urlProblem(url);if(pr){er.textContent=pr;return}
     btn.disabled=true;btn.textContent='מתחבר…';try{await connectNew(url);toast('הגיליון חובר. עכשיו אפשר לשלוח קוד הצטרפות לשותף');location.hash='#sync';renderSync()}catch(e){const m=String(e&&e.message||'');er.textContent=(m==='paired'||m==='busy'||m==='server')?errText(e):CONNECT_HELP;btn.disabled=false;btn.textContent='חבר את הגיליון'}},
