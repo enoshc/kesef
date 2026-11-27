@@ -695,7 +695,10 @@ function smsCur_(c) {
   return 'ILS';
 }
 function smsCleanName_(s) {
-  s = String(s || '').replace(/^[\s:'"\-]+|[\s:'"\-]+$/g, '').replace(/\s+/g, ' ');
+  s = String(s || '').replace(/\s+/g, ' ')
+    .replace(/\s+(?:חייב(?:ה)?|חויב(?:ה)?|גבה|גבתה|ביצע(?:ה)?|זיכה|זיכתה)(?:\s.*)?$/, '')
+    .replace(/\s+(?:את\s+)?(?:כרטיס|חשבו)\S*(?:\s.*)?$/, '')
+    .replace(/^[\s:'"\-]+|[\s:'"\-]+$/g, '');
   if (!s || s.length < 2 || /^\d+$/.test(s)) return '';
   if (/^(?:כרטיס|כרטיסך|חשבון|חשבונך|תאריך|סך|סכום|עסקה|יתרה|יתרת|לפרטים|שקל|ש"ח|הוראת קבע$)/.test(s)) return '';
   return s.slice(0, 60);
@@ -749,7 +752,17 @@ function parseSms_(raw, today) {
     function () {
       for (var li = 0; li < lines.length; li++) {
         var lm = lines[li].match(/^(?:בית ה?עסק:?\s*)?(.+?)\s*[-:]?\s*(?:סכום|בסך|על סך)\s*[-:]?\s*[\d₪]/);
-        if (lm && !/חרגת|יתר[הת]|כרטיס|חשבו|^(?:היי|שלום)/.test(lm[1])) return lm;
+        if (!lm) continue;
+        var cand = smsCleanName_(lm[1].replace(/^[^:]{1,20}:\s*/, ''));
+        if (cand && !/חרגת|יתר[הת]|כרטיס|חשבו|עסקה|רכישה|חיוב|זיכוי|העברה|בוצע|ביצעת|^(?:היי|שלום)/.test(cand)) return [0, cand];
+      }
+      return null;
+    },
+    function () {
+      var src2 = lines.length ? lines : [s];
+      for (var li = 0; li < src2.length; li++) {
+        var vm = src2[li].match(/^(?:[^:]{1,20}:\s*)?(.{2,50}?)\s+(?:חייב(?:ה)?|חויב(?:ה)?|גבה|גבתה)\s+(?:את\s+)?(?:כרטיס|חשבו)/);
+        if (vm) { var c2 = smsCleanName_(vm[1]); if (c2 && !/עסקה|רכישה|^(?:היי|שלום)/.test(c2)) return [0, c2]; }
       }
       return null;
     },
