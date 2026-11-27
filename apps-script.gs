@@ -7,10 +7,11 @@
 var TX = 'תנועות';
 var CFG = 'הגדרות';
 var FOLDER = 'הכסף שלי - קבלות';
-var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's', 'הערה', 'תגיות'];
-var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11, note: 12, tags: 13};
+var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's', 'הערה', 'תגיות', 'x'];
+var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11, note: 12, tags: 13, x: 14};
 var TECH = C.s - C.id + 1;
-var VERSION = 12;
+var VERSION = 13;
+var AUTO_ = function () { return typeof KESEF_AUTO !== 'undefined' && !!KESEF_AUTO; };
 var DEVS = 'מכשירים';
 var DH = ['dev', 'name', 'endpoint', 'pub', 'prefs', 'tokens', 'queue', 'updated'];
 var KINDS = {
@@ -22,20 +23,22 @@ var KINDS = {
 
 function doGet(e) {
   var q = (e && e.parameter) || {};
+  if (q.w) { try { return out_(summary_(String(q.w))); } catch (err) { return out_({ok: false, err: 'server'}); } }
+  if (q.tok && q.q) return ingestLocked_({action: 'quick', tok: q.tok, text: q.q, src: q.src || 'Siri'});
   if (q.tok) return ingestLocked_({tok: q.tok, text: q.text || q.message || '', src: q.src || ''});
-  return out_({ok: true, app: 'kesef', v: VERSION});
+  return out_({ok: true, app: 'kesef', v: VERSION, auto: AUTO_()});
 }
 
 function ingestLocked_(req) {
   var lock = LockService.getScriptLock();
   try { lock.waitLock(25000); } catch (err) { return out_({ok: false, err: 'busy'}); }
-  try { return out_(ingest_(req)); } catch (err) { return out_({ok: false, err: 'server', msg: String(err && err.message || err)}); } finally { lock.releaseLock(); }
+  try { return out_(req.action === 'quick' ? quick_(req) : ingest_(req)); } catch (err) { return out_({ok: false, err: 'server', msg: String(err && err.message || err)}); } finally { lock.releaseLock(); }
 }
 
 function doPost(e) {
   var req;
   try { req = JSON.parse(e.postData.contents); } catch (err) { return out_({ok: false, err: 'bad_json'}); }
-  if (req && req.action === 'ingest') return ingestLocked_(req);
+  if (req && (req.action === 'ingest' || req.action === 'quick')) return ingestLocked_(req);
   var props = PropertiesService.getScriptProperties();
   var lock = LockService.getScriptLock();
   try { lock.waitLock(25000); } catch (err) { return out_({ok: false, err: 'busy'}); }
@@ -48,9 +51,15 @@ function doPost(e) {
       setup_();
       return out_({ok: true, v: VERSION, now: Date.now(), sheet: SpreadsheetApp.getActive().getUrl()});
     }
-    if (!key || req.key !== key) return out_({ok: false, err: 'key'});
-    if (req.action === 'ping') return out_({ok: true, v: VERSION, now: Date.now(), sheet: SpreadsheetApp.getActive().getUrl()});
-    if (req.action === 'sync') return out_(sync_(req));
+    var vkey = props.getProperty('VKEY'), ro = !!(vkey && req.key && req.key === vkey);
+    if (!key || (req.key !== key && !ro)) return out_({ok: false, err: 'key'});
+    if (ro && ['ping', 'sync', 'getimg', 'push-reg', 'push-prefs', 'push-unreg', 'push-test', 'notifs'].indexOf(req.action) < 0) return out_({ok: false, err: 'ro'});
+    if (ro && req.action === 'sync') { req.tx = []; req.items = []; req.cfg = null; }
+    if (req.action === 'ping') return out_({ok: true, v: VERSION, now: Date.now(), sheet: ro ? '' : SpreadsheetApp.getActive().getUrl(), ro: ro, auto: AUTO_()});
+    if (req.action === 'sync') { var so = sync_(req); so.ro = ro; so.auto = AUTO_(); if (ro) so.sheet = ''; return out_(so); }
+    if (req.action === 'view-key') return out_(tokenOf_('VKEY', req.rotate, 32));
+    if (req.action === 'widget-token') return out_(tokenOf_('WTOK', req.rotate, 24));
+    if (req.action === 'reload') { if (typeof KESEF_RELOAD === 'function') KESEF_RELOAD(); return out_({ok: true, v: VERSION, auto: AUTO_()}); }
     if (req.action === 'img') return out_(putImg_(req));
     if (req.action === 'getimg') return out_(getImg_(req));
     if (req.action === 'weekly') return out_(weekly_(req));
@@ -71,6 +80,33 @@ function doPost(e) {
 
 function out_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function tokenOf_(name, rotate, len) {
+  var props = PropertiesService.getScriptProperties();
+  if (rotate) props.deleteProperty(name);
+  var t = props.getProperty(name);
+  if (!t) { t = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '').slice(0, len); props.setProperty(name, t); }
+  return {ok: true, v: VERSION, tok: t};
+}
+
+/* ---------- סוגי תנועות: הקטגוריה קובעת מה זה, הכיוון (סוג) קובע אם נכנס או יצא ----------
+ * הוצאה בקטגוריית הוצאה = הוצאה. הכנסה בקטגוריית הוצאה = זיכוי שמקטין אותה.
+ * בחיסכון: הוצאה = הפקדה, הכנסה = משיכה. העברה בין חשבונות לא נספרת בכלל. */
+function kindOf_(t, c) { if (!c) return t.t; return c.int ? 'int' : c.sav ? 'sav' : (c.k === 'inc' ? 'inc' : 'exp'); }
+function signed_(t) { return t.t === 'exp' ? t.a : -t.a; }
+function incA_(t, c) { return kindOf_(t, c) === 'inc' ? -signed_(t) : 0; }
+function expA_(t, c) { return kindOf_(t, c) === 'exp' ? signed_(t) : 0; }
+function savA_(t, c) { return kindOf_(t, c) === 'sav' ? signed_(t) : 0; }
+function cleanX_(x) {
+  if (!x || typeof x !== 'object') return '';
+  var s = '';
+  try { s = JSON.stringify(x); } catch (e) { return ''; }
+  return s === '{}' || s.length > 3000 ? '' : s;
+}
+function parseX_(v) {
+  if (!v) return {};
+  try { var o = JSON.parse(String(v)); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; }
 }
 
 function tz_() {
@@ -101,9 +137,11 @@ function setup_() {
     } catch (e) {}
     sh.hideColumns(C.id + 1, TECH);
   }
+  if (sh.getMaxColumns() < H.length) sh.insertColumnsAfter(sh.getMaxColumns(), H.length - sh.getMaxColumns());
   [[C.note, 'הערה'], [C.tags, 'תגיות']].forEach(function (x) {
     if (sh.getRange(1, x[0] + 1).getValue() !== x[1]) sh.getRange(1, x[0] + 1).setValue(x[1]).setFontWeight('bold').setBackground('#00a862').setFontColor('#0b0b10');
   });
+  if (sh.getRange(1, C.x + 1).getValue() !== 'x') { sh.getRange(1, C.x + 1).setValue('x'); try { sh.hideColumns(C.x + 1, 1); } catch (e) {} }
   var cf = ss.getSheetByName(CFG);
   if (!cf) {
     cf = ss.insertSheet(CFG);
@@ -135,7 +173,7 @@ function toRow_(t, now, imgs) {
   return {
     vals: [date, t.t === 'inc' ? 'הכנסה' : 'הוצאה', Math.abs(+t.a || 0), safe_(t.cn), safe_(t.n), '', t.del ? 'כן' : '',
       String(t.id), String(t.c || ''), img, +t.u || now, now, safe_(String(t.note || '').slice(0, 500)),
-      safe_((Array.isArray(t.tags) ? t.tags : []).map(String).join(', ').slice(0, 300))],
+      safe_((Array.isArray(t.tags) ? t.tags : []).map(String).join(', ').slice(0, 300)), cleanX_(t.x)],
     f: img && imgs[img] ? link_(imgs[img]) : ''
   };
 }
@@ -165,7 +203,7 @@ function fromRow_(v, tz) {
   return {
     id: String(v[C.id]), d: ds, t: /הכנס|inc/i.test(String(v[C.t])) ? 'inc' : 'exp',
     a: Math.abs(amt || 0), cn: String(v[C.cn] || ''), n: String(v[C.n] || ''),
-    c: String(v[C.c] || ''), img: String(v[C.img] || ''), u: +v[C.u] || 0, s: +v[C.s] || 0, note: String(v[C.note] || ''), tags: String(v[C.tags] || '').split(/\s*,\s*/).filter(String),
+    c: String(v[C.c] || ''), img: String(v[C.img] || ''), u: +v[C.u] || 0, s: +v[C.s] || 0, note: String(v[C.note] || ''), tags: String(v[C.tags] || '').split(/\s*,\s*/).filter(String), x: parseX_(v[C.x]),
     del: del === true || /^(כן|v|x|1|true|yes)$/i.test(String(del).trim())
   };
 }
@@ -189,6 +227,7 @@ function sync_(req) {
     if (!t || !t.id) return;
     var row = toRow_(t, now, imgs), at = idx[t.id];
     if (at !== undefined) {
+      if (t.x === undefined) row.vals[C.x] = data[at][C.x] || '';
       if ((+t.u || 0) >= (+data[at][C.u] || 0)) { data[at] = row.vals; writeRow_(sh, at + 2, row); sent[t.id] = 1; }
     } else {
       row.t = t; idx[t.id] = data.length; data.push(row.vals); append.push(row); sent[t.id] = 1;
@@ -300,7 +339,7 @@ function writeCats_(cf, cfg) {
   cf.getRange(4, 1, Math.max(1, cf.getMaxRows() - 3), 4).clearContent();
   var rows = [['קטגוריה', 'סוג', '% מהמשכורת', 'נכנסת לחלוקה']];
   cats.forEach(function (c) {
-    rows.push([safe_(c.name), c.k === 'inc' ? 'הכנסה' : 'הוצאה', c.k === 'exp' ? (+c.pct || 0) : '', c.k === 'inc' ? (c.sal ? 'כן' : 'לא') : '']);
+    rows.push([safe_(c.name), c.int ? 'העברה בין חשבונות' : c.sav ? 'חיסכון והשקעות' : c.k === 'inc' ? 'הכנסה' : 'הוצאה', c.k === 'exp' && !c.int ? (+c.pct || 0) : '', c.k === 'inc' && !c.int ? (c.sal ? 'כן' : 'לא') : '']);
   });
   rows.push(['יעד חיסכון חודשי', '', +cfg.goal || 0, '']);
   cf.getRange(4, 1, rows.length, 4).setValues(rows);
@@ -417,25 +456,24 @@ function weeklyEmail() {
   var cats = cfg.cats || [], byId = {};
   cats.forEach(function (c) { byId[c.id] = c; });
   var catOf = function (t) { return byId[t.c] || cats.filter(function (c) { return c.name === t.cn; })[0] || null; };
-  var isSav = function (t) { var c = catOf(t); return !!(c && c.sav); };
   var now = new Date(), today = Utilities.formatDate(now, tz, 'yyyy-MM-dd'), ym = today.slice(0, 7);
   var from = Utilities.formatDate(new Date(now.getTime() - 7 * 864e5), tz, 'yyyy-MM-dd');
-  var sum = function (arr, f) { return arr.filter(f).reduce(function (s, t) { return s + t.a; }, 0); };
+  var sumF = function (arr, f) { return arr.reduce(function (s, t) { return s + f(t, catOf(t)); }, 0); };
   var week = tx.filter(function (t) { return t.d > from && t.d <= today; });
   var month = tx.filter(function (t) { return t.d.slice(0, 7) === ym && t.d <= today; });
-  var wSpend = sum(week, function (t) { return t.t === 'exp' && !isSav(t); });
-  var mInc = sum(month, function (t) { return t.t === 'inc'; });
-  var mSpend = sum(month, function (t) { return t.t === 'exp' && !isSav(t); });
-  var mSav = sum(month, function (t) { return t.t === 'exp' && isSav(t); });
-  var sal = sum(month, function (t) { var c = catOf(t); return t.t === 'inc' && c && c.sal; });
+  var wSpend = sumF(week, expA_);
+  var mInc = sumF(month, incA_);
+  var mSpend = sumF(month, expA_);
+  var mSav = sumF(month, savA_);
+  var sal = sumF(month.filter(function (t) { var c = catOf(t); return c && c.sal; }), incA_);
   var byc = {};
-  week.forEach(function (t) { if (t.t !== 'exp' || isSav(t)) return; var c = catOf(t), k = c ? c.name : (t.cn || 'שונות'); byc[k] = (byc[k] || 0) + t.a; });
-  var top = Object.keys(byc).sort(function (a, b) { return byc[b] - byc[a]; }).slice(0, 5);
+  week.forEach(function (t) { var v = expA_(t, catOf(t)); if (!v) return; var c = catOf(t), k = c ? c.name : (t.cn || 'שונות'); byc[k] = (byc[k] || 0) + v; });
+  var top = Object.keys(byc).filter(function (k) { return byc[k] > 0; }).sort(function (a, b) { return byc[b] - byc[a]; }).slice(0, 5);
   var ap = (+cfg.alertPct || 80) / 100, alerts = [];
   cats.forEach(function (c) {
-    if (c.k !== 'exp' || c.sav || !sal) return;
+    if (c.k !== 'exp' || c.sav || c.int || !sal) return;
     var b = sal * (+c.pct || 0) / 100; if (!b) return;
-    var s = sum(month, function (t) { var cc = catOf(t); return t.t === 'exp' && cc && cc.id === c.id; });
+    var s = month.reduce(function (acc, t) { var cc = catOf(t); return cc && cc.id === c.id ? acc + signed_(t) : acc; }, 0);
     if (s / b >= ap) alerts.push({name: c.name, s: s, b: b, r: s / b});
   });
   alerts.sort(function (a, b) { return b.r - a.r; });
@@ -474,26 +512,25 @@ function monthlyEmail() {
   var cats = cfg.cats || [], byId = {};
   cats.forEach(function (c) { byId[c.id] = c; });
   var catOf = function (t) { return byId[t.c] || cats.filter(function (c) { return c.name === t.cn; })[0] || null; };
-  var isSav = function (t) { var c = catOf(t); return !!(c && c.sav); };
+  var sumF = function (arr, f) { return arr.reduce(function (s, t) { return s + f(t, catOf(t)); }, 0); };
   var now = new Date(), y = +Utilities.formatDate(now, tz, 'yyyy'), m = +Utilities.formatDate(now, tz, 'M') - 1;
   var py = m === 0 ? y - 1 : y, pm = m === 0 ? 11 : m - 1;
   var ym = py + '-' + pad_(pm + 1), py2 = pm === 0 ? py - 1 : py, pm2 = pm === 0 ? 11 : pm - 1, ym2 = py2 + '-' + pad_(pm2 + 1);
-  var sum = function (arr, f) { return arr.filter(f).reduce(function (s, t) { return s + t.a; }, 0); };
   var month = tx.filter(function (t) { return t.d.slice(0, 7) === ym; });
   var prev = tx.filter(function (t) { return t.d.slice(0, 7) === ym2; });
-  var inc = sum(month, function (t) { return t.t === 'inc'; });
-  var spend = sum(month, function (t) { return t.t === 'exp' && !isSav(t); });
-  var sav = sum(month, function (t) { return t.t === 'exp' && isSav(t); });
-  var pSpend = sum(prev, function (t) { return t.t === 'exp' && !isSav(t); });
-  var sal = sum(month, function (t) { var c = catOf(t); return t.t === 'inc' && c && c.sal; });
+  var inc = sumF(month, incA_);
+  var spend = sumF(month, expA_);
+  var sav = sumF(month, savA_);
+  var pSpend = sumF(prev, expA_);
+  var sal = sumF(month.filter(function (t) { var c = catOf(t); return c && c.sal; }), incA_);
   var net = inc - spend - sav, goal = +cfg.goal || 0, name = cfg.name || 'הכסף שלי', mn = MONTHS_[pm];
   var byc = {};
-  month.forEach(function (t) { if (t.t !== 'exp' || isSav(t)) return; var c = catOf(t), k = c ? c.id || c.name : (t.cn || 'שונות'); byc[k] = (byc[k] || 0) + t.a; });
-  var rows = Object.keys(byc).sort(function (a, b) { return byc[b] - byc[a]; }).slice(0, 8).map(function (k) {
+  month.forEach(function (t) { var v = expA_(t, catOf(t)); if (!v) return; var c = catOf(t), k = c ? c.id || c.name : (t.cn || 'שונות'); byc[k] = (byc[k] || 0) + v; });
+  var rows = Object.keys(byc).filter(function (k) { return byc[k] > 0; }).sort(function (a, b) { return byc[b] - byc[a]; }).slice(0, 8).map(function (k) {
     var c = byId[k], b = c && sal ? sal * (+c.pct || 0) / 100 : 0, s = byc[k];
     return {name: c ? c.name : k, s: s, b: b, over: b && s > b};
   });
-  var big = month.filter(function (t) { return t.t === 'exp' && !isSav(t); }).sort(function (a, b) { return b.a - a.a; }).slice(0, 5);
+  var big = month.filter(function (t) { return expA_(t, catOf(t)) > 0; }).sort(function (a, b) { return b.a - a.a; }).slice(0, 5);
   var ch = pSpend ? Math.round((spend - pSpend) / pSpend * 100) : null;
   var td = 'padding:7px 0;border-bottom:1px solid #e3efe8';
   var row = function (a, b, col) { return '<tr><td style="' + td + '">' + a + '</td><td style="' + td + ';text-align:left;font-weight:bold;' + (col ? 'color:' + col : '') + '">' + b + '</td></tr>'; };
@@ -611,14 +648,14 @@ function budgetEvents_(data, cfg, tz) {
     var t = fromRow_(v, tz);
     if (t.del || t.d.slice(0, 7) !== ym) return;
     var c = catOf(t); if (!c) return;
-    if (t.t === 'inc' && c.sal) sal += t.a;
-    if (t.t === 'exp') sp[c.id] = (sp[c.id] || 0) + t.a;
+    if (c.sal) sal += incA_(t, c);
+    if (kindOf_(t, c) === 'exp') sp[c.id] = (sp[c.id] || 0) + signed_(t);
   });
   var props = PropertiesService.getScriptProperties(), key = 'BL_' + ym, lv = {};
   try { lv = JSON.parse(props.getProperty(key) || '{}'); } catch (e) {}
   var ev = [], changed = false;
   cats.forEach(function (c) {
-    if (c.k !== 'exp' || c.sav || !sal || !(+c.pct)) return;
+    if (c.k !== 'exp' || c.sav || c.int || !sal || !(+c.pct)) return;
     var b = sal * c.pct / 100, s = sp[c.id] || 0, l = s > b + 0.5 ? 2 : (s >= ap * b ? 1 : 0), old = lv[c.id] || 0;
     if (l > old) ev.push({type: 'budget', title: 'התראת תקציב', body: l === 2 ? c.name + ': חריגה של ' + money_(s - b) + ' מהתקציב' : c.name + ': ניצלתם ' + Math.round(s / b * 100) + '% מהתקציב, נשארו ' + money_(b - s)});
     if (l !== old) { lv[c.id] = l; changed = true; }
@@ -811,6 +848,52 @@ function smsCat_(p, s, cfg) {
   }
   return cats.filter(function (c) { return c.k === p.t && /שונות|אחרת/.test(c.name); })[0] || cats.filter(function (c) { return c.k === p.t; })[0] || null;
 }
+var REFUND_RX = /זיכוי|זוכה|זוכית|החזר|בוטל|ביטול|refund|credited|reversal/i;
+var INCOME_RX = /משכורת|שכר עבודה|העברה נכנסת|התקבלה העברה|קיבלת|הועבר(?:ו|ה)? (?:אליך|לחשבונך)|שלח(?:ה)? לך|הופקד|הפקדה|\bbit\b|(?:^|\s)ביט(?=\s|$)|paybox|פייבוקס/i;
+function nameTok_(s) { return String(s || '').replace(/^\s*(?:העברה|תשלום)\s+/, '').trim().split(/\s+/).filter(function (w) { return w.length > 1; }); }
+function selfHit_(s, names) {
+  return (names || []).some(function (n) { var w = String(n).trim().split(/\s+/).filter(function (x) { return x.length > 1; }); return w.length >= 2 && s.indexOf(w[0]) >= 0 && s.indexOf(w[w.length - 1]) >= 0; });
+}
+function ownHit_(s, own) {
+  return (own || []).some(function (n) { var w = String(n).replace(/^\s*העברה\s+(?:מ|ל)/, '').trim(); return w.length >= 3 && s.indexOf(w) >= 0; });
+}
+/** זיכוי שהגיע: מחפש את הקנייה המקורית (אותו בית עסק, עד 150 יום אחורה) כדי לשים אותו באותה קטגוריה. */
+function refundMatch_(p, data, tz, cats) {
+  var byId = {}; cats.forEach(function (c) { byId[c.id] = c; });
+  var k = smsKey_(p.n).split(' ')[0], best = null;
+  for (var i = data.length - 1; i >= 0; i--) {
+    var v = data[i]; if (!v[C.id]) continue;
+    var t = fromRow_(v, tz), c = byId[t.c] || cats.filter(function (x) { return x.name === t.cn; })[0];
+    if (t.del || t.t !== 'exp' || !c || c.int || c.k !== 'exp') continue;
+    var gap = (new Date(p.d) - new Date(t.d)) / 864e5;
+    if (gap < -3 || gap > 150) continue;
+    var sameName = k && k.length > 1 && smsKey_(t.n).split(' ')[0] === k, sameAmt = Math.abs(t.a - p.a) < 0.01;
+    if (!sameName && !(sameAmt && !k)) continue;
+    var score = (sameAmt ? 0 : 1000) + Math.abs(gap);
+    if (!best || score < best.score) best = {c: c, t: t, score: score};
+  }
+  return best;
+}
+function pickCat_(p, s, cfg, data, tz) {
+  var cats = (cfg && cfg.cats) || [], ex = (cfg && cfg.ex) || {};
+  var intC = cats.filter(function (c) { return c.int; })[0], savC = cats.filter(function (c) { return c.sav; })[0];
+  if (intC && (selfHit_(s, ex.self) || ownHit_(s, ex.own))) return {c: intC};
+  if (savC && /INTERACTIVE|IBKR|קנית ני"?ע|מכירת ני"?ע|הפקדה לחיסכון|משיכה מחיסכון/i.test(s)) return {c: savC};
+  if (p.t === 'inc' && REFUND_RX.test(s) && !INCOME_RX.test(s)) {
+    var m = refundMatch_(p, data, tz, cats);
+    if (m) return {c: m.c, ref: m.t};
+    var e = smsCat_({t: 'exp', n: p.n}, s, cfg);
+    if (e) return {c: e, ref: {}};
+  }
+  return {c: smsCat_(p, s, cfg)};
+}
+function acctOf_(p, s, src) {
+  if (/pepper|פפר|bank|בנק/i.test(src)) return 'bank';
+  if (/max|מקס|wallet|apple|ארנק|כאל|cal|isracard|ישראכרט/i.test(src)) return 'card';
+  if (/בכרטיס|כרטיס(?:ך)?\s|המסתיים/.test(s) && p.card) return 'card';
+  return /חשבו|העברה|הופקד|משיכ/.test(s) ? 'bank' : (p.card ? 'card' : '');
+}
+
 function fxRate_(cur) {
   var cache = CacheService.getScriptCache(), k = 'fx_' + cur, v = cache.get(k);
   if (v) return +v;
@@ -901,23 +984,96 @@ function ingest_(req) {
 
   var cf = SpreadsheetApp.getActive().getSheetByName(CFG), cfg = {};
   try { cfg = JSON.parse((cf && cf.getRange('A2').getValue()) || '{}'); } catch (e) {}
-  var c = smsCat_(p, s, cfg);
+  var sh = setup_(), n0 = Math.max(0, sh.getLastRow() - 1), data = n0 ? sh.getRange(2, 1, n0, H.length).getValues() : [];
+  var pick = pickCat_(p, s, cfg, data, tz), c = pick.c;
   var name = p.n || (p.t === 'inc' ? 'זיכוי' : 'חיוב') + (p.card ? ' ' + p.card : '');
+  if (pick.ref && pick.ref.n) note.unshift('זיכוי על ' + pick.ref.n + ' מ-' + pick.ref.d.split('-').reverse().join('/'));
+  var x = {rv: 1}, ac = acctOf_(p, s, src);
+  if (ac) x.ac = ac;
+  if (p.cur !== 'ILS') x.cur = p.a + ' ' + p.cur;
+  var mi = p.inst && p.inst.match(/תשלום (\d+) מתוך (\d+)/); if (mi) x['in'] = {i: +mi[1], n: +mi[2]};
   var t = {id: 'b' + newId_().slice(0, 11), d: p.d, t: p.t, a: a, c: c ? c.id : '', cn: c ? c.name : '', n: name,
-    note: note.join(' · '), tags: ['אוטומטי'], u: now};
+    note: note.join(' · '), tags: ['אוטומטי'], x: x, u: now};
 
-  var sh = setup_(), row = toRow_(t, now, {});
+  var row = toRow_(t, now, {});
   sh.getRange(sh.getLastRow() + 1, 1, 1, H.length).setValues([row.vals]);
+  data.push(row.vals);
   seen.push({h: h, a: p.a, c: p.card, t: p.t, ts: now, id: t.id});
   props.setProperty('ING_SEEN', JSON.stringify(seen.slice(-120)));
   inboxLog_(src, text, 'נקלט', {a: a, t: p.t, n: name}, t.id);
 
   try {
-    var n = Math.max(0, sh.getLastRow() - 1), data = n ? sh.getRange(2, 1, n, H.length).getValues() : [];
-    var ev = [{type: 'bank', all: true, title: p.t === 'inc' ? 'זיכוי' + (p.card ? ' ב-' + p.card : '') : 'חיוב' + (p.card ? ' בכרטיס ' + p.card : ''),
-      body: money2_(a) + ' · ' + name + (c ? ' ← ' + c.name : '')}];
+    var ev = [{type: 'bank', all: true, title: p.t === 'inc' ? (pick.ref ? 'זיכוי' : 'נכנס') + (p.card ? ' ב-' + p.card : '') : 'חיוב' + (p.card ? ' בכרטיס ' + p.card : ''),
+      body: money2_(a) + ' · ' + name + (c ? ' ← ' + c.name : '') + (pick.ref ? ' (מקטין את ההוצאה)' : '')}];
     budgetEvents_(data, cfg, tz).forEach(function (e) { e.all = true; ev.push(e); });
     pushAll_(ev, '', now);
   } catch (e) {}
-  return {ok: true, v: VERSION, id: t.id, a: a, t: p.t, n: name, cat: c ? c.name : ''};
+  return {ok: true, v: VERSION, id: t.id, a: a, t: p.t, n: name, cat: c ? c.name : '', ref: !!pick.ref};
+}
+
+/* ---------- הוספה מהירה (סירי / קיצור דרך): "50 שקל קפה" ---------- */
+function parseQuick_(raw, today, tz) {
+  var s = smsNorm_(raw).replace(/^(?:תוסיף|הוסף|תרשום|רשום|תכניס|הכנס|תוסיפי|תרשמי)\s+/, '');
+  if (!s) return {skip: 'empty'};
+  var m = s.match(/(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:[.,]\d{1,2})?)/);
+  if (!m) return {skip: 'noamount'};
+  var a = smsNum_(m[1]); if (!(a > 0)) return {skip: 'noamount'};
+  var ref = /^(?:זיכוי|החזר|קיבלתי החזר)(?=\s|$)/.test(s), inc = !ref && /^(?:הכנסה|קיבלתי|נכנס(?:ו|ה)?|משכורת)(?=\s|$)|(?:^|\s)הכנסה(?=\s|$)/.test(s);
+  var d = today;
+  if (/(?:^|\s)אתמול(?=\s|$)/.test(s)) d = Utilities.formatDate(new Date(Date.now() - 864e5), tz, 'yyyy-MM-dd');
+  var n = (s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length))
+    .replace(/₪|ש"ח|שח(?=\s|$)|שקלים|שקל|nis|ils/gi, ' ').replace(/(?:^|\s)(?:היום|אתמול)(?=\s|$)/g, ' ')
+    .replace(/\s+/g, ' ').trim()
+    .replace(/^(?:(?:הוצאה|הכנסה|זיכוי|החזר|קיבלתי|שילמתי|הוצאתי|על|ב|של|עבור|ל|מ|ב-|ל-|מ-)\s+)+/, '').replace(/\s+(?:על|ב|של|עבור)$/, '').trim();
+  return {a: a, t: inc || ref ? 'inc' : 'exp', ref: ref, n: n.slice(0, 60), d: d, cur: 'ILS', card: ''};
+}
+function quick_(req) {
+  var props = PropertiesService.getScriptProperties(), tok = props.getProperty('ING');
+  if (!tok || String(req.tok || '') !== tok) return {ok: false, err: 'tok'};
+  var tz = tz_(), now = Date.now(), today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), text = String(req.text || '').slice(0, 300);
+  var p = parseQuick_(text, today, tz);
+  if (p.skip) return {ok: false, err: p.skip, say: 'לא הבנתי את הסכום. נסה למשל: חמישים שקל קפה'};
+  var cf = SpreadsheetApp.getActive().getSheetByName(CFG), cfg = {};
+  try { cfg = JSON.parse((cf && cf.getRange('A2').getValue()) || '{}'); } catch (e) {}
+  var sh = setup_(), n0 = Math.max(0, sh.getLastRow() - 1), data = n0 ? sh.getRange(2, 1, n0, H.length).getValues() : [];
+  var c = null, refT = null;
+  if (p.ref) { var m = refundMatch_(p, data, tz, cfg.cats || []); if (m) { c = m.c; refT = m.t; } else c = smsCat_({t: 'exp', n: p.n}, p.n, cfg); }
+  else c = smsCat_(p, p.n, cfg);
+  var name = p.n || (p.t === 'inc' ? 'הכנסה' : 'הוצאה');
+  var x = {rv: 1}; if (/^(?:card|bank|cash)$/.test(String(req.ac || ''))) x.ac = String(req.ac);
+  var t = {id: 'q' + newId_().slice(0, 11), d: p.d, t: p.t, a: p.a, c: c ? c.id : '', cn: c ? c.name : '', n: name,
+    note: (refT ? 'זיכוי על ' + refT.n + ' · ' : '') + 'נוסף בקול: "' + text.slice(0, 120) + '"', tags: ['סירי'], x: x, u: now};
+  var row = toRow_(t, now, {});
+  sh.getRange(sh.getLastRow() + 1, 1, 1, H.length).setValues([row.vals]); data.push(row.vals);
+  try {
+    var ev = [{type: 'tx', all: false, title: String(req.who || 'סירי').slice(0, 30), body: (p.t === 'inc' ? (p.ref ? 'זיכוי של ' : 'הכנסה של ') : 'הוצאה של ') + money2_(p.a) + ': ' + name}];
+    budgetEvents_(data, cfg, tz).forEach(function (e) { e.all = true; ev.push(e); });
+    pushAll_(ev, 'siri', now);
+  } catch (e) {}
+  var say = 'נרשם: ' + (p.ref ? 'זיכוי של ' : p.t === 'inc' ? 'הכנסה של ' : '') + (Math.round(p.a * 100) / 100) + ' שקל' + (p.n ? ', ' + p.n : '') + (c ? ', ' + c.name : '');
+  return {ok: true, v: VERSION, id: t.id, a: p.a, t: p.t, n: name, cat: c ? c.name : '', say: say};
+}
+
+/* ---------- וידג'ט: סיכום החודש לקריאה בלבד, עם מפתח נפרד ---------- */
+function summary_(w) {
+  var props = PropertiesService.getScriptProperties(), tok = props.getProperty('WTOK');
+  if (!tok || w !== tok) return {ok: false, err: 'tok'};
+  var ss = SpreadsheetApp.getActive(), sh = ss.getSheetByName(TX), tz = tz_();
+  var n = sh ? Math.max(0, sh.getLastRow() - 1) : 0, data = n ? sh.getRange(2, 1, n, H.length).getValues() : [];
+  var cfg = {};
+  try { cfg = JSON.parse(ss.getSheetByName(CFG).getRange('A2').getValue() || '{}'); } catch (e) {}
+  var cats = cfg.cats || [], byId = {}; cats.forEach(function (c) { byId[c.id] = c; });
+  var catOf = function (t) { return byId[t.c] || cats.filter(function (c) { return c.name === t.cn; })[0] || null; };
+  var now = new Date(), today = Utilities.formatDate(now, tz, 'yyyy-MM-dd'), ym = today.slice(0, 7);
+  var month = data.filter(function (v) { return v[C.id]; }).map(function (v) { return fromRow_(v, tz); }).filter(function (t) { return !t.del && t.d.slice(0, 7) === ym && t.d <= today; });
+  var sumF = function (f) { return month.reduce(function (s, t) { return s + f(t, catOf(t)); }, 0); };
+  var inc = sumF(incA_), spend = sumF(expA_), sav = sumF(savA_);
+  var sal = month.filter(function (t) { var c = catOf(t); return c && c.sal; }).reduce(function (s, t) { return s + incA_(t, catOf(t)); }, 0);
+  var rows = cats.filter(function (c) { return c.k === 'exp' && !c.int && !c.sav; }).map(function (c) {
+    var s = month.reduce(function (a, t) { var cc = catOf(t); return cc && cc.id === c.id ? a + signed_(t) : a; }, 0), b = sal * (+c.pct || 0) / 100;
+    return {name: c.name, s: Math.round(s), b: Math.round(b), color: c.color || ''};
+  }).filter(function (r) { return r.s > 0; }).sort(function (a, b) { return (b.b ? b.s / b.b : 0) - (a.b ? a.s / a.b : 0) || b.s - a.s; }).slice(0, 4);
+  var rv = data.filter(function (v) { if (!v[C.id] || !v[C.x]) return false; var x = parseX_(v[C.x]); return x.rv && !/^(כן|v|x|1|true|yes)$/i.test(String(v[C.del]).trim()); }).length;
+  return {ok: true, v: VERSION, name: cfg.name || 'הכסף שלי', month: MONTHS_[+ym.slice(5) - 1] + ' ' + ym.slice(0, 4), left: Math.round(inc - spend - sav),
+    inc: Math.round(inc), spend: Math.round(spend), sav: Math.round(sav), goal: +cfg.goal || 0, cats: rows, review: rv, ts: Date.now()};
 }
