@@ -744,7 +744,15 @@ function parseSms_(raw, today) {
   }
 
   var n = '', after = s.slice(best.end), mm2;
+  var lines = String(raw || '').split(/\r?\n/).map(smsNorm_).filter(String);
   var pats = [
+    function () {
+      for (var li = 0; li < lines.length; li++) {
+        var lm = lines[li].match(/^(?:בית ה?עסק:?\s*)?(.+?)\s*[-:]?\s*(?:סכום|בסך|על סך)\s*[-:]?\s*[\d₪]/);
+        if (lm && !/חרגת|יתר[הת]|כרטיס|חשבו|^(?:היי|שלום)/.test(lm[1])) return lm;
+      }
+      return null;
+    },
     function () { return s.match(new RegExp('(?:בבית העסק|בבית עסק|בית העסק|בית עסק|אצל|בעסק)[:\\s-]+(.+?)' + SMS_STOP)); },
     function () { return s.match(new RegExp('(?:בגין|עבור|מאת|לטובת|תיאור:?)\\s*:?\\s*([^,.;\\n\\d][^,.;\\n]{1,50}?)' + SMS_STOP)); },
     function () { return after.match(new RegExp('^\\s*(?:ב-|ב\\s|ב(?!גין|כרטיס|חשבו|תאריך|יום|שעה)(?=[א-תA-Za-z0-9"\'])|אצל\\s|at\\s|ל-|לטובת\\s)\\s*(.+?)' + SMS_STOP, 'i')); },

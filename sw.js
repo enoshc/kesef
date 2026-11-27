@@ -1,4 +1,4 @@
-const C='kesef-v19';
+const C='kesef-v20';
 const A=['./','./index.html','./app.css?v=12','./app.js?v=18','./apps-script.gs','./manifest.webmanifest','./icon-192-2.png','./icon-512-2.png','./apple-touch-icon-2.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(A)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
