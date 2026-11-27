@@ -64,9 +64,13 @@ function normX(x){if(!x||typeof x!=='object')return null;const o={};
   if(x.ab)o.ab=1;if(/^[A-Z]{2}$/.test(x.cc||''))o.cc=x.cc;if(x.cur)o.cur=String(x.cur).slice(0,24);
   return Object.keys(o).length?o:null}
 function normTx(t){if(!t||!YMD.test(t.d))return null;const o={id:String(t.id||rid()),d:t.d,t:t.t==='inc'?'inc':'exp',a:Math.round(Math.abs(+t.a||0)*100)/100,c:String(t.c||''),n:String(t.n||'').slice(0,200),img:String(t.img||''),u:+t.u||0};const nt=String(t.note||'').slice(0,500);if(nt)o.note=nt;const tg=normTags(t.tags);if(tg.length)o.tags=tg;const xx=normX(t.x);if(xx)o.x=xx;if(t.del)o.del=1;return o}
+function normBiz(b){b=b&&typeof b==='object'?b:{};return {name:String(b.name||'').trim().slice(0,60),id:String(b.id||'').replace(/\D/g,'').slice(0,9),addr:String(b.addr||'').trim().slice(0,80),phone:String(b.phone||'').replace(/[^\d+\- ]/g,'').slice(0,20),next:clamp(Math.round(+b.next||1),1,999999)}}
+function normDoc(r){if(!r||typeof r!=='object')return null;const id=String(r.id||'').replace(/[^a-z0-9]/gi,'').slice(0,16);if(id.length<6)return null;const a=Math.round(Math.abs(+r.a||0)*100)/100;if(!(a>0)||!(+r.n>0))return null;const pay=['cash','bank','bit','card','other'].includes(r.pay)?r.pay:'bank';return {id,n:Math.round(+r.n),d:YMD.test(r.d)?r.d:todayStr,who:String(r.who||'').trim().slice(0,60),what:String(r.what||'').trim().slice(0,200),a,pay,tx:String(r.tx||'').replace(/[^a-z0-9]/gi,'').slice(0,16),void:r.void?1:0}}
 function normEx(e){e=e&&typeof e==='object'?e:{};const str=(a,n=30,m=40)=>Array.isArray(a)?[...new Set(a.map(x=>String(x||'').trim().slice(0,m)).filter(Boolean))].slice(0,n):[];
   const bal=e.bal&&YMD.test(e.bal.d||'')&&isFinite(+e.bal.v)?{d:e.bal.d,v:Math.round(+e.bal.v*100)/100}:null;
-  return {self:str(e.self,6),own:str(e.own,20),nosub:str(e.nosub,80,60),bill:clamp(Math.round(+e.bill||10),1,28),cut:clamp(Math.round(+e.cut||7),1,28),bal,minBal:Math.round(+e.minBal||0),people:str(e.people,40,30)}}
+  const docs=Array.isArray(e.docs)?e.docs.map(normDoc).filter(Boolean).slice(-500):[];
+  const biz=normBiz(e.biz);const maxN=docs.reduce((m,d)=>Math.max(m,d.n),0);if(biz.next<=maxN)biz.next=maxN+1;
+  return {self:str(e.self,6),own:str(e.own,20),nosub:str(e.nosub,80,60),bill:clamp(Math.round(+e.bill||10),1,28),cut:clamp(Math.round(+e.cut||7),1,28),bal,minBal:Math.round(+e.minBal||0),people:str(e.people,40,30),biz,docs}}
 function normTags(a){return Array.isArray(a)?[...new Set(a.map(x=>String(x||'').replace(/,/g,' ').trim().slice(0,30)).filter(Boolean))].slice(0,8):[]}
 function normRec(r){if(!r||typeof r!=='object')return null;const id=String(r.id||'').replace(/[^a-z0-9]/g,'').slice(0,8);if(id.length!==8)return null;const a=Math.round(Math.abs(+r.a||0)*100)/100;if(!(a>0))return null;return {id,n:String(r.n||'').slice(0,60),a,t:r.t==='inc'?'inc':'exp',c:String(r.c||''),day:clamp(Math.round(+r.day||1),1,31),start:/^\d{4}-\d{2}$/.test(r.start)?r.start:nowYm,skip:Array.isArray(r.skip)?r.skip.filter(x=>/^\d{4}-\d{2}$/.test(x)).slice(-60):[],on:r.on!==false}}
 function normRules(o){const r={};if(o&&typeof o==='object')Object.keys(o).slice(0,600).forEach(k=>{if(k&&k.length<=60&&typeof o[k]==='string')r[k]=o[k].slice(0,40)});return r}
@@ -387,7 +391,7 @@ let xlsxP=null;
 function loadXLSX(){if(window.XLSX)return Promise.resolve();return xlsxP||(xlsxP=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=()=>res();s.onerror=()=>{xlsxP=null;rej(new Error('xlsx'))};document.head.appendChild(s)}))}
 
 /* ---------- chrome: drawer, router, status ---------- */
-const TITLES={home:'סקירה',tx:'תנועות',budget:'תקציב',reports:'דוחות',bank:'בנק וכרטיס',settings:'הגדרות',msgs:'הודעות',album:'תמונות ורקע',import:'ייבוא מאקסל ושיטס',sync:'סנכרון משותף',backup:'גיבוי וייצוא',profile:'פרופיל והתקנה'};
+const TITLES={home:'סקירה',tx:'תנועות',budget:'תקציב',reports:'דוחות',bank:'בנק וכרטיס',docs:'קבלות ללקוחות',settings:'הגדרות',msgs:'הודעות',album:'תמונות ורקע',import:'ייבוא מאקסל ושיטס',sync:'סנכרון משותף',backup:'גיבוי וייצוא',profile:'פרופיל והתקנה'};
 function openDrawer(){$('#drawer').classList.add('open');$('#scrim').hidden=false;$('#menuBtn').setAttribute('aria-expanded','true');$('#moreBtn')?.setAttribute('aria-expanded','true');setTimeout(()=>$('#drawer .menu a.on, #drawer .menu a')?.focus(),50)}
 function closeDrawer(){$('#drawer').classList.remove('open');$('#scrim').hidden=true;$('#menuBtn').setAttribute('aria-expanded','false');$('#moreBtn')?.setAttribute('aria-expanded','false')}
 function openSpeed(){$('#speed').hidden=false;$('#scrim2').hidden=false;$('#fab').setAttribute('aria-expanded','true')}
@@ -943,7 +947,7 @@ function doImport(){
 /* ---------- render all ---------- */
 function render(){
   chrome();
-  if(ui.view==='home')renderHome();else if(ui.view==='tx')renderTx();else if(ui.view==='budget')renderBudget();else if(ui.view==='sync')renderSync();else if(ui.view==='import')renderImport();else if(ui.view==='msgs')renderMsgs();else if(ui.view==='reports')renderReports();else if(ui.view==='bank')renderBank();else if(ui.view==='album')renderAlbum();else if(ui.view==='settings')renderSettings();
+  if(ui.view==='home')renderHome();else if(ui.view==='tx')renderTx();else if(ui.view==='budget')renderBudget();else if(ui.view==='sync')renderSync();else if(ui.view==='import')renderImport();else if(ui.view==='msgs')renderMsgs();else if(ui.view==='reports')renderReports();else if(ui.view==='bank')renderBank();else if(ui.view==='docs')renderDocs();else if(ui.view==='album')renderAlbum();else if(ui.view==='settings')renderSettings();
   if(ui.view!=='home')stopHomeAlbum();
   BG.apply();
 }
@@ -1808,6 +1812,87 @@ function renderSetBank(){const ex=S.ex;$('#setBank').innerHTML=`<div class="gset
 <label>להתריע כשהיתרה תרד מתחת ל־<input class="field" id="exMin" type="number" inputmode="numeric" step="100" value="${ex.minBal}"></label></div>
 <p class="hint" style="margin:0">עסקה עד היום שבחרת נכנסת לחיוב של אותו חודש, ואחריו לחיוב של החודש הבא. ב־max זה בדרך כלל עד ה־7 לחודש. כשיש תאריך חיוב מהקובץ, הוא קובע.</p>`}
 document.addEventListener('change',e=>{const id=e.target.id;if(id==='exBill'||id==='exCut'||id==='exMin'){const v=Math.round(+e.target.value||0);change(()=>{if(id==='exBill')S.ex.bill=clamp(v,1,28);else if(id==='exCut')S.ex.cut=clamp(v,1,28);else S.ex.minBal=v},{cfg:true,undo:false})}});
+
+/* ---------- customer receipts (osek patur) ---------- */
+const PAYL={cash:'מזומן',bank:'העברה בנקאית',bit:'ביט',card:'כרטיס אשראי',other:'אחר'};
+const PATUR={2026:122833};
+let docBusy=false;
+const docMoney=n=>'₪'+(Math.round(n*100)/100).toLocaleString('he-IL',{minimumFractionDigits:2,maximumFractionDigits:2});
+function idOk(id){const s=String(id||'').replace(/\D/g,'').padStart(9,'0');if(!/^\d{9}$/.test(s)||/^0+$/.test(s))return false;let sum=0;for(let i=0;i<9;i++){let x=+s[i]*((i%2)+1);if(x>9)x=x-9;sum+=x}return sum%10===0}
+function bizCat(){return incs().find(c=>!c.sal&&/עסק|צד|אחר/.test(c.name))||incs().find(c=>!c.sal)||null}
+function docBy(id){return S.ex.docs.find(d=>d.id===id)}
+function docText(r){const b=S.ex.biz,dd=r.d.split('-').reverse().join('/');return [`קבלה ${r.n}${r.void?' (בוטלה)':''}`,b.name,b.id?`עוסק פטור מס׳ ${b.id}`:'עוסק פטור','פטור ממע״מ. זו אינה חשבונית מס.',b.addr,b.phone?`טלפון ${b.phone}`:'',`תאריך ${dd}`,`לכבוד: ${r.who}`,r.what,`התקבל ${docMoney(r.a)}`,PAYL[r.pay]||''].filter(Boolean).join('\n')}
+function paperHtml(r){const b=S.ex.biz,dd=r.d.split('-').reverse().join('/');return `<p class="kicker">קבלה</p><h2>${esc(b.name||'העסק')}</h2><p>עוסק פטור${b.id?` · מס׳ ${esc(b.id)}`:''}</p>${b.addr?`<p>${esc(b.addr)}</p>`:''}${b.phone?`<p>${esc(b.phone)}</p>`:''}<p class="num">מס׳ ${r.n}${r.void?' · בוטלה':''}</p><p>תאריך ${esc(dd)}</p><hr><p><b>לכבוד</b> ${esc(r.who)}</p><p>${esc(r.what)}</p><p class="sum">התקבל ${esc(docMoney(r.a))}</p><p>${esc(PAYL[r.pay]||'')}</p><hr><p class="fine">פטור ממע״מ. המסמך הזה הוא קבלה על תשלום שהתקבל, לא חשבונית מס.</p>`}
+function openDoc(id){const r=docBy(id);if(!r)return;$('#paper').innerHTML=paperHtml(r);$('#paper').dataset.id=id;$('#docVoid').hidden=!!r.void;show($('#dDoc'))}
+function renderDocs(){
+  if(!docBusy&&$('#docF')&&document.activeElement&&$('#docsBody').contains(document.activeElement))return;
+  const b=S.ex.biz,y=T0.getFullYear(),cap=PATUR[y]||0;
+  const year=S.ex.docs.filter(d=>!d.void&&d.d.startsWith(String(y)));
+  const sum=year.reduce((s,d)=>s+d.a,0);
+  const warn=cap&&sum>cap?`עברת את תקרת העוסק הפטור ל־${y} (${fmt(cap)}).`:cap&&sum>cap*.8?`התקרבנו לתקרת ${y}: ${fmt(cap)}.`:cap?`התקרה ל־${y} היא ${fmt(cap)}.`:'התקרה מתעדכנת כל שנה באתר רשות המסים.';
+  const rows=[...S.ex.docs].sort((a,c)=>c.n-a.n);
+  $('#docsBody').innerHTML=`<div class="card"><h2>קבלה ללקוח</h2>
+<p class="hint">עוסק פטור מוציא קבלה ברגע שהתשלום התקבל. אין מע״מ, וזו לא חשבונית מס. המספר רץ ולא חוזר על עצמו.</p>
+<details class="biz" ${b.name&&b.id?'':'open'}><summary><b>פרטי העוסק</b><small>${esc(b.name&&b.id?b.name+' · '+b.id:'חסרים שם ומספר עוסק')}</small></summary>
+<div class="gset" style="margin-top:10px">
+<label>שם העוסק<input class="field" id="bizName" maxlength="60" value="${esc(b.name)}" placeholder="השם שמופיע בתיק"></label>
+<label>מספר עוסק<input class="field" id="bizId" inputmode="numeric" maxlength="9" value="${esc(b.id)}" placeholder="9 ספרות"></label>
+<label>כתובת<input class="field" id="bizAddr" maxlength="80" value="${esc(b.addr)}" placeholder="לא חובה"></label>
+<label>טלפון<input class="field" id="bizPhone" maxlength="20" value="${esc(b.phone)}" placeholder="לא חובה"></label>
+</div></details>
+<form id="docF" style="margin-top:14px">
+<div class="row2">
+<label>לכבוד<input class="field" id="docWho" maxlength="60" required placeholder="שם הלקוח"></label>
+<label>תאריך<input class="field" id="docD" type="date" required value="${todayStr}"></label>
+</div>
+<label>על מה שולם<input class="field" id="docWhat" maxlength="200" required placeholder="למשל: ייעוץ, שיעור, תיקון"></label>
+<div class="row2">
+<label>סכום שהתקבל<input class="field" id="docA" type="number" inputmode="decimal" min="0.01" step="0.01" required placeholder="0"></label>
+<label>איך שולם<select class="field" id="docPay"><option value="bank">העברה בנקאית</option><option value="bit">ביט</option><option value="card">כרטיס אשראי</option><option value="cash">מזומן</option><option value="other">אחר</option></select></label>
+</div>
+<label class="chk"><input type="checkbox" id="docInc">לרשום גם כהכנסה בעסק. סמן רק אם התשלום עוד לא נכנס מהבנק, אחרת הוא ייספר פעמיים</label>
+<p class="err" id="docErr"></p>
+<div class="btnrow"><button class="btn solid" type="submit">הוצא קבלה ${b.next}</button></div>
+</form></div>
+<div class="card"><h2>השנה</h2><p class="gnum" style="margin:0"><b>${esc(fmt(sum))}</b><span>${year.length} קבלות ב־${y}</span></p><p class="hint">${esc(warn)} לפי הקבלות שהוצאו כאן, לא לפי כל מה שנכנס בבנק.</p></div>
+<div class="card"><h2>קבלות</h2>${rows.length?`<div class="dayl">${rows.map(r=>`<div class="txr" data-doc="${esc(r.id)}" style="${r.void?'opacity:.55':''}"><div class="tav">#${r.n}</div><div class="tm"><b>${esc(r.who||'בלי שם')}</b><small>${esc(r.d.split('-').reverse().join('/'))}${r.void?' · בוטלה':''} · ${esc(r.what)}</small></div><b class="ta">${esc(docMoney(r.a))}</b></div>`).join('')}</div>`:'<p class="empty">עוד אין קבלות.</p>'}</div>`;
+}
+function saveBiz(){const name=$('#bizName')?.value.trim().slice(0,60)||'',id=($('#bizId')?.value||'').replace(/\D/g,'').slice(0,9),addr=$('#bizAddr')?.value.trim().slice(0,80)||'',phone=($('#bizPhone')?.value||'').replace(/[^\d+\- ]/g,'').slice(0,20);
+  if(name===S.ex.biz.name&&id===S.ex.biz.id&&addr===S.ex.biz.addr&&phone===S.ex.biz.phone)return;
+  change(()=>{S.ex.biz.name=name;S.ex.biz.id=id;S.ex.biz.addr=addr;S.ex.biz.phone=phone},{cfg:true,undo:false})}
+$('#docsBody').addEventListener('change',e=>{if(e.target.closest('#bizName,#bizId,#bizAddr,#bizPhone'))saveBiz()});
+$('#docsBody').addEventListener('click',e=>{const row=e.target.closest('[data-doc]');if(row)openDoc(row.dataset.doc)});
+$('#docsBody').addEventListener('submit',e=>{
+  if(e.target.id!=='docF')return;e.preventDefault();
+  const name=$('#bizName').value.trim().slice(0,60),idn=($('#bizId').value||'').replace(/\D/g,'').slice(0,9),addr=$('#bizAddr').value.trim().slice(0,80),phone=($('#bizPhone').value||'').replace(/[^\d+\- ]/g,'').slice(0,20);
+  const who=$('#docWho').value.trim().slice(0,60),what=$('#docWhat').value.trim().slice(0,200),d=$('#docD').value,a=Math.round((parseFloat($('#docA').value)||0)*100)/100,pay=$('#docPay').value,inc=$('#docInc').checked,er=$('#docErr');
+  er.textContent='';
+  if(!name){er.textContent='קודם שם העוסק, בפרטים למעלה.';$('#bizName').focus();return}
+  if(!idOk(idn)){er.textContent='מספר העוסק צריך להיות 9 ספרות תקינות, כולל ספרת ביקורת.';$('#bizId').focus();return}
+  if(!who||!what){er.textContent='צריך שם לקוח ועל מה שולם.';return}
+  if(!YMD.test(d)){er.textContent='צריך תאריך.';return}
+  if(!(a>0)){er.textContent='צריך סכום גדול מאפס.';return}
+  const n=Math.max(S.ex.biz.next,S.ex.docs.reduce((m,x)=>Math.max(m,x.n),0)+1),id=rid(8);let txId='';
+  const txIds=[];
+  docBusy=true;
+  change(()=>{
+    Object.assign(S.ex.biz,{name,id:idn,addr,phone,next:n+1});
+    if(inc){let c=bizCat();if(!c){c=normCat({id:rid(8),k:'inc',name:'הכנסה מעסק',color:'#12a5b8',sal:false});S.cats.push(c)}txId=rid();txIds.push(txId);S.tx.push({id:txId,d,t:'inc',a,c:c.id,n:who,note:`קבלה ${n}: ${what}`.slice(0,500),tags:['קבלה'],img:'',u:0})}
+    S.ex.docs.push({id,n,d,who,what,a,pay,tx:txId,void:0});
+  },{tx:txIds,cfg:true});
+  docBusy=false;
+  toast(`קבלה ${n} הוצאה ל${who}`,true);openDoc(id);
+});
+$('#docShare').addEventListener('click',async()=>{const r=docBy($('#paper').dataset.id);if(!r)return;const text=docText(r);if(navigator.share){try{await navigator.share({title:`קבלה ${r.n}`,text});return}catch(e){if(e&&e.name==='AbortError')return}}copyText(text,'הקבלה הועתקה. אפשר להדביק אותה בוואטסאפ','קבלה')});
+$('#docPrint').addEventListener('click',()=>window.print());
+$('#docVoid').addEventListener('click',async()=>{
+  const r=docBy($('#paper').dataset.id);if(!r||r.void)return;
+  if(!(await ask('לבטל את הקבלה?','המספר נשאר תפוס ולא יינתן לקבלה אחרת. אם נרשמה ממנה הכנסה שלא ערכת, היא תימחק.','בטל קבלה',true)))return;
+  const tx=r.tx?[r.tx]:[];
+  docBusy=true;
+  change(()=>{const d=docBy(r.id);if(!d)return;d.void=1;if(d.tx){const t=S.tx.find(x=>x.id===d.tx);if(t&&String(t.note||'').startsWith('קבלה '+d.n)&&Math.abs(t.a-d.a)<0.02)removeTx(t.id)}},{tx,cfg:true});
+  docBusy=false;hide($('#dDoc'));toast(`קבלה ${r.n} בוטלה. המספר לא יחזור`,true);
+});
 
 /* ---------- review inbox (auto-ingested) + rules ---------- */
 const rvList=()=>TX().filter(t=>t.x?.rv).sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0);

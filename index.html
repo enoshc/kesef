@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=19">
+<link rel="stylesheet" href="app.css?v=20">
 </head>
 <body>
 <a class="skip" href="#main">דילוג לתוכן</a>
@@ -72,6 +72,7 @@
     <div role="group" aria-labelledby="navMore">
       <a href="#reports" data-nav="reports"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg>דוחות ומגמות</a>
       <a href="#bank" data-nav="bank"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg>בנק וכרטיס</a>
+      <a href="#docs" data-nav="docs"><svg class="ic" aria-hidden="true"><use href="#i-note"/></svg>קבלות ללקוחות</a>
     </div>
     <hr>
     <a href="#settings" data-nav="settings"><svg class="ic" aria-hidden="true"><use href="#i-gear"/></svg>הגדרות<span class="mbadge" id="mSync"></span><b class="cnt" data-unread hidden></b></a>
@@ -255,6 +256,10 @@
     <div class="pad grid2" id="bankBody"></div>
   </section>
 
+  <section class="view" data-view="docs" hidden>
+    <div class="pad stack" id="docsBody"></div>
+  </section>
+
   <section class="view" data-view="msgs" hidden>
     <div class="pad chatpad">
       <div class="note" id="msgUpd" hidden></div>
@@ -325,6 +330,7 @@
             <a href="#backup"><b>גיבוי וייצוא</b><small>שמירה לקובץ, Excel או CSV</small></a>
             <a href="#msgs"><b>הודעות</b><small>בין מי שמחובר לחשבון</small><span class="cnt" data-unread hidden></span></a>
             <a href="#album"><b>תמונות ורקע</b><small>אלבום, רקע ושומר מסך</small></a>
+            <a href="#docs"><b>קבלות ללקוחות</b><small>קבלה לעוסק פטור, בלי מע״מ</small></a>
           </nav>
         </div>
       </div>
@@ -507,6 +513,11 @@
   <img id="viewImg" alt="תמונה">
 </dialog>
 
+<dialog id="dDoc">
+  <div class="paper" id="paper"></div>
+  <div class="btnrow noprint"><button type="button" class="btn solid" id="docShare">שתף</button><button type="button" class="btn" id="docPrint">הדפס</button><button type="button" class="btn danger" id="docVoid">בטל קבלה</button><button type="button" class="btn" data-close>סגור</button></div>
+</dialog>
+
 <dialog id="dAsk">
   <div class="grab"></div>
   <div class="dh"><h2 id="askT"></h2></div>
@@ -546,6 +557,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=30"></script>
+<script src="app.js?v=31"></script>
 </body>
 </html>

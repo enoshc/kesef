@@ -133,6 +133,23 @@ svg text{font:13px Assistant,sans-serif;fill:var(--mute);paint-order:stroke;stro
 .gnote{margin:10px 0 0;font-size:15px}
 #gFlow:empty{display:none}
 #gSave{margin-top:12px}
+
+.biz summary{display:flex;justify-content:space-between;gap:12px;align-items:baseline;cursor:pointer}
+.biz summary small{color:var(--mute);font-weight:400}
+.paper{background:#fff;color:#1a1a1a;border:1px solid #ddd;border-radius:16px;padding:22px 20px;margin-bottom:14px}
+.paper h2{color:#1a1a1a;margin:0 0 4px}
+.paper p{margin:2px 0}
+.paper .kicker{font:700 13px Rubik,sans-serif;letter-spacing:.12em}
+.paper .num{margin-top:12px;font-weight:700}
+.paper .sum{font:700 28px Rubik,sans-serif;margin:14px 0}
+.paper hr{border:0;border-top:1px solid #ddd;margin:12px 0}
+.paper .fine{color:#555;font-size:13px}
+@media print{
+  body>*{display:none!important}
+  #dDoc{display:block!important;position:static!important;inset:auto;width:auto;max-width:none;max-height:none;border:0;box-shadow:none;background:#fff;padding:0}
+  #dDoc .noprint{display:none!important}
+  .paper{border:0;border-radius:0}
+}
 .ghist{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:14px 0 0}
 .ghist div{text-align:center;font-size:13px;color:var(--mute)}
 .ghist span{display:block;height:10px;border-radius:5px;background:var(--mist);border:1px solid var(--line);margin-bottom:4px}
