@@ -10,7 +10,7 @@ var FOLDER = 'הכסף שלי - קבלות';
 var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's', 'הערה', 'תגיות'];
 var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11, note: 12, tags: 13};
 var TECH = C.s - C.id + 1;
-var VERSION = 6;
+var VERSION = 7;
 var KINDS = {
   msg: {name: 'הודעות', H: ['תאריך', 'מאת', 'הודעה', 'נמחק', 'id', 'u', 's', 'data'], V: 4, D: 3,
     vis: function (it) { return [new Date(it.ts), safe_(it.by), safe_(it.text), it.del ? 'כן' : '']; }},
@@ -356,21 +356,22 @@ function weekly_(req) {
     .filter(function (e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }).slice(0, 5);
   var app = /^https:\/\//.test(String(req.app || '')) ? String(req.app) : '';
   var freq = ['week', 'month', 'both'].indexOf(req.freq) >= 0 ? req.freq : 'week';
-  props.setProperty('WEEKLY', JSON.stringify({emails: emails, on: !!req.on, app: app, freq: freq}));
+  var mday = Math.min(28, Math.max(1, Math.round(+req.mday || 11)));
+  props.setProperty('WEEKLY', JSON.stringify({emails: emails, on: !!req.on, app: app, freq: freq, mday: mday}));
   ScriptApp.getProjectTriggers().forEach(function (t) {
     var f = t.getHandlerFunction();
     if (f === 'weeklyEmail' || f === 'monthlyEmail') ScriptApp.deleteTrigger(t);
   });
   if (req.on && emails.length) {
     if (freq !== 'month') ScriptApp.newTrigger('weeklyEmail').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(8).inTimezone('Asia/Jerusalem').create();
-    if (freq !== 'week') ScriptApp.newTrigger('monthlyEmail').timeBased().onMonthDay(1).atHour(8).inTimezone('Asia/Jerusalem').create();
+    if (freq !== 'week') ScriptApp.newTrigger('monthlyEmail').timeBased().onMonthDay(mday).atHour(8).inTimezone('Asia/Jerusalem').create();
   }
   var sent = false;
   if (req.test && emails.length) {
     if (freq !== 'week') monthlyEmail(); else weeklyEmail();
     sent = true;
   }
-  return {ok: true, v: VERSION, emails: emails, on: !!req.on && emails.length > 0, freq: freq, sent: sent};
+  return {ok: true, v: VERSION, emails: emails, on: !!req.on && emails.length > 0, freq: freq, mday: mday, sent: sent};
 }
 
 function money_(x) {
@@ -435,7 +436,7 @@ function weeklyEmail() {
 
 var MONTHS_ = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
 
-/** סיכום של החודש שהסתיים, נשלח ב־1 לכל חודש. */
+/** סיכום של החודש הקודם, נשלח ביום שנבחר בכל חודש (ברירת מחדל: 11). */
 function monthlyEmail() {
   var w = {};
   try { w = JSON.parse(PropertiesService.getScriptProperties().getProperty('WEEKLY') || '{}'); } catch (e) {}

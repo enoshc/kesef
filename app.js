@@ -33,7 +33,7 @@ const DEF=()=>[
   {id:'i1',k:'inc',name:'משכורת',color:'#00a862',sal:true},
   {id:'i2',k:'inc',name:'עבודות צד',color:'#12a5b8'},
   {id:'i3',k:'inc',name:'הכנסה אחרת',color:'#6b7f2a'}];
-const blank=()=>({cats:DEF().map(normCat),tx:[],items:[],rec:[],rules:{},weekly:{emails:[],on:false,freq:'month'},goal:2000,alertPct:80,su:0,profile:{name:''}});
+const blank=()=>({cats:DEF().map(normCat),tx:[],items:[],rec:[],rules:{},weekly:{emails:[],on:false,freq:'month',mday:11},goal:2000,alertPct:80,su:0,profile:{name:''}});
 function sampleData(){
   let s=20261127;const r=()=>(s=s*16807%2147483647)/2147483647;const tx=[];
   for(let k=5;k>=0;k--){
@@ -59,7 +59,7 @@ function normTx(t){if(!t||!YMD.test(t.d))return null;const o={id:String(t.id||ri
 function normTags(a){return Array.isArray(a)?[...new Set(a.map(x=>String(x||'').replace(/,/g,' ').trim().slice(0,30)).filter(Boolean))].slice(0,8):[]}
 function normRec(r){if(!r||typeof r!=='object')return null;const id=String(r.id||'').replace(/[^a-z0-9]/g,'').slice(0,8);if(id.length!==8)return null;const a=Math.round(Math.abs(+r.a||0)*100)/100;if(!(a>0))return null;return {id,n:String(r.n||'').slice(0,60),a,t:r.t==='inc'?'inc':'exp',c:String(r.c||''),day:clamp(Math.round(+r.day||1),1,31),start:/^\d{4}-\d{2}$/.test(r.start)?r.start:nowYm,skip:Array.isArray(r.skip)?r.skip.filter(x=>/^\d{4}-\d{2}$/.test(x)).slice(-60):[],on:r.on!==false}}
 function normRules(o){const r={};if(o&&typeof o==='object')Object.keys(o).slice(0,600).forEach(k=>{if(k&&k.length<=60&&typeof o[k]==='string')r[k]=o[k].slice(0,40)});return r}
-function normWeekly(w){return {emails:Array.isArray(w?.emails)?w.emails.map(String).slice(0,5):[],on:!!w?.on,freq:['week','month','both'].includes(w?.freq)?w.freq:'month'}}
+function normWeekly(w){return {emails:Array.isArray(w?.emails)?w.emails.map(String).slice(0,5):[],on:!!w?.on,freq:['week','month','both'].includes(w?.freq)?w.freq:'month',mday:clamp(Math.round(+w?.mday||11),1,28)}}
 function normItem(it){if(!it||(it.k!=='msg'&&it.k!=='pic'))return null;const id=String(it.id||'').replace(/[^a-z0-9]/gi,'').slice(0,40);if(!id)return null;const o={id,k:it.k,u:+it.u||0,by:String(it.by||'').slice(0,40),dv:String(it.dv||'').replace(/[^a-z0-9]/gi,'').slice(0,20),ts:+it.ts||0,text:String(it.text||'').slice(0,2000),img:String(it.img||'').replace(/[^a-z0-9]/gi,'').slice(0,40)};if(it.del)o.del=1;return o}
 function norm(d){
   const o=blank();if(!d||typeof d!=='object')return o;
@@ -501,7 +501,7 @@ function syncStatusHtml(){const pend=SY.dirty.length+SY.idirty.length+(SY.cfgDir
   return `<div class="status${bad?' err':''}" id="syncStat"><svg class="ic"><use href="#i-${bad?'alert':'check'}"/></svg><div><b>${bad?'הסנכרון נכשל':syncState==='busy'?'מסנכרן…':'מחובר לגיליון משותף'}</b><small>${esc(bad?SY.err:`עודכן ${agoText(SY.last)}${pend?`, ${pend} שינויים מחכים`:''}`)}</small></div></div>`}
 function renderSync(){
   const b=$('#syncBody'),keep={},ae=document.activeElement,aid=ae&&b.contains(ae)?ae.id:'',selS=aid&&ae.selectionStart!=null?ae.selectionStart:null,selE=aid&&ae.selectionEnd!=null?ae.selectionEnd:null;
-  ['wEm','wOn','wFreq','joinCode','joinMerge','gsUrl'].forEach(id=>{const el=$('#'+id);if(el)keep[id]=el.type==='checkbox'?el.checked:el.value});
+  ['wEm','wOn','wFreq','wDay','joinCode','joinMerge','gsUrl'].forEach(id=>{const el=$('#'+id);if(el)keep[id]=el.type==='checkbox'?el.checked:el.value});
   renderSyncInner(b);renderedSv=SY.sv;
   Object.keys(keep).forEach(id=>{const el=$('#'+id);if(!el)return;if(el.type==='checkbox'){if(!el.disabled)el.checked=keep[id]}else el.value=keep[id]});
   if(aid){const el=$('#'+aid);if(el){el.focus({preventScroll:true});try{if(selS!=null)el.setSelectionRange(selS,selE)}catch{}}}
@@ -512,7 +512,7 @@ function renderSyncInner(b){
 ${syncStatusHtml()}
 <p class="hint">כל שינוי שאתה עושה נשלח לגיליון, והאפליקציה בודקת עדכונים מהמכשירים האחרים כל 20 שניות. אפשר גם לערוך ישירות בגיליון, והשינויים יגיעו לאפליקציה.</p>
 <div class="btnrow"><button class="btn solid" data-act="sync-now">סנכרן עכשיו</button>${SY.sheet&&/^https:\/\//.test(SY.sheet)?`<a class="btn" href="${esc(SY.sheet)}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-sheet"/></svg>פתח את הגיליון</a>`:''}</div></div>
-${SY.sv&&SY.sv<6?`<div class="card"><h2>עדכון הסקריפט בגיליון</h2><p class="hint">יש גרסה חדשה של הסקריפט, עם ${[SY.sv<3?'תמונות והודעות':'',SY.sv<4?'הערות':'',SY.sv<5?'תגיות':'','סיכום חודשי ושבועי במייל'].filter(Boolean).join(', ')}. עד שתעדכן, הן נשמרות רק במכשיר ויישלחו אחרי העדכון. מעדכנים פעם אחת, ממכשיר אחד:</p><ol class="steps"><li><div><b>פותחים את עורך הסקריפטים</b><p>בגיליון: <kbd>Extensions</kbd> ← <kbd>Apps Script</kbd>.</p></div></li><li><div><b>מחליפים את הקוד</b><p>מוחקים את כל הקוד הישן, מדביקים את החדש ושומרים.</p><button class="btn solid sm" data-act="copy-gs">העתק את הקוד החדש</button></div></li><li><div><b>מאשרים שליחת מיילים</b><p>למעלה בעורך, בתפריט שליד <kbd>Debug</kbd> בוחרים את הפונקציה <kbd>authorize</kbd> ולוחצים <kbd>Run</kbd>. מאשרים את ההרשאות כמו בפעם הראשונה.</p></div></li><li><div><b>מפרסמים גרסה חדשה</b><p><kbd>Deploy</kbd> ← <kbd>Manage deployments</kbd> ← סמל העיפרון ← ב־<kbd>Version</kbd> בוחרים <kbd>New version</kbd> ← <kbd>Deploy</kbd>. הכתובת לא משתנה ואין צורך לחבר מחדש.</p></div></li></ol><button class="btn sm" data-act="sync-now">בדוק שוב</button></div>`:''}
+${SY.sv&&SY.sv<7?`<div class="card"><h2>עדכון הסקריפט בגיליון</h2><p class="hint">יש גרסה חדשה של הסקריפט, עם ${[SY.sv<3?'תמונות והודעות':'',SY.sv<4?'הערות':'',SY.sv<5?'תגיות':'','סיכום חודשי ושבועי במייל'].filter(Boolean).join(', ')}. עד שתעדכן, הן נשמרות רק במכשיר ויישלחו אחרי העדכון. מעדכנים פעם אחת, ממכשיר אחד:</p><ol class="steps"><li><div><b>פותחים את עורך הסקריפטים</b><p>בגיליון: <kbd>Extensions</kbd> ← <kbd>Apps Script</kbd>.</p></div></li><li><div><b>מחליפים את הקוד</b><p>מוחקים את כל הקוד הישן, מדביקים את החדש ושומרים.</p><button class="btn solid sm" data-act="copy-gs">העתק את הקוד החדש</button></div></li><li><div><b>מאשרים שליחת מיילים</b><p>למעלה בעורך, בתפריט שליד <kbd>Debug</kbd> בוחרים את הפונקציה <kbd>authorize</kbd> ולוחצים <kbd>Run</kbd>. מאשרים את ההרשאות כמו בפעם הראשונה.</p></div></li><li><div><b>מפרסמים גרסה חדשה</b><p><kbd>Deploy</kbd> ← <kbd>Manage deployments</kbd> ← סמל העיפרון ← ב־<kbd>Version</kbd> בוחרים <kbd>New version</kbd> ← <kbd>Deploy</kbd>. הכתובת לא משתנה ואין צורך לחבר מחדש.</p></div></li></ol><button class="btn sm" data-act="sync-now">בדוק שוב</button></div>`:''}
 ${weeklyCard()}
 <div class="card"><h2>הוספת שותף</h2><p class="hint">שלח את הקוד הזה למי שמנהל איתך את החשבון. הוא פותח את האפליקציה, נכנס לסנכרון משותף ובוחר "הצטרפות עם קוד". מי שיש לו את הקוד יכול לראות ולשנות את הנתונים, אז שלח אותו רק למי שאתה סומך עליו.</p>
 <textarea class="field code" readonly rows="3" id="invTxt">${esc(inviteCode())}</textarea>
@@ -1061,12 +1061,14 @@ $('#txN').addEventListener('input',()=>{if(chipTouched)return;const r=S.rules[mk
 
 /* ---------- weekly email ---------- */
 function weeklyCard(){
-  const w=S.weekly,old=SY.sv&&SY.sv<6,f=w.freq||'month';
+  const w=S.weekly,old=SY.sv&&SY.sv<7,f=w.freq||'month',md=w.mday||11;
   return `<div class="card"><h2><svg class="ic" style="vertical-align:-4px"><use href="#i-mail"/></svg> סיכום במייל</h2>
-<p class="hint">מייל קצר מהגיליון לשניכם. <b>חודשי:</b> ב־1 לכל חודש ב־8:00, סיכום החודש שהסתיים, כולל הכנסות, הוצאות, חיסכון מול היעד, קטגוריות מול התקציב וההוצאות הגדולות. <b>שבועי:</b> כל יום ראשון ב־8:00, מה הוצאתם השבוע ומה קרוב לחריגה.</p>
+<p class="hint">מייל קצר מהגיליון לשניכם. <b>חודשי:</b> ביום שתבחרו בכל חודש ב־8:00, סיכום החודש הקודם, כולל הכנסות, הוצאות, חיסכון מול היעד, קטגוריות מול התקציב וההוצאות הגדולות. <b>שבועי:</b> כל יום ראשון ב־8:00, מה הוצאתם השבוע ומה קרוב לחריגה.</p>
 ${old?'<p class="hint bad">צריך קודם לעדכן את הסקריפט בגיליון (ההוראות למעלה).</p>':''}
 <label class="lbl" for="wFreq">כל כמה זמן</label>
 <select class="field" id="wFreq" style="margin-bottom:10px"><option value="month"${f==='month'?' selected':''}>כל חודש</option><option value="week"${f==='week'?' selected':''}>כל שבוע</option><option value="both"${f==='both'?' selected':''}>גם חודשי וגם שבועי</option></select>
+<label class="lbl" for="wDay">המייל החודשי נשלח ב־</label>
+<select class="field" id="wDay" style="margin-bottom:10px">${Array.from({length:28},(_,i)=>i+1).map(d=>`<option value="${d}"${d===md?' selected':''}>${d} לחודש${d===11?' (יום אחרי חיוב האשראי)':''}</option>`).join('')}</select>
 <label class="lbl" for="wEm">כתובות מייל, מופרדות בפסיק (עד 5)</label>
 <input class="field" id="wEm" type="email" multiple inputmode="email" placeholder="you@gmail.com, partner@gmail.com" value="${esc(w.emails.join(', '))}">
 <label class="chk"><input type="checkbox" id="wOn"${w.on?' checked':''}>לשלוח</label>
@@ -1074,13 +1076,13 @@ ${old?'<p class="hint bad">צריך קודם לעדכן את הסקריפט בג
 <div class="btnrow"><button class="btn solid sm" data-act="weekly-save"${old?' disabled':''}>שמור</button><button class="btn sm" data-act="weekly-test"${old?' disabled':''}>שלח דוגמה עכשיו</button></div></div>`;
 }
 async function weeklySave(test,btn){
-  const emails=$('#wEm').value.split(/[,\s;]+/).map(x=>x.trim()).filter(Boolean),on=$('#wOn').checked,freq=$('#wFreq').value,er=$('#wErr');er.textContent='';
+  const emails=$('#wEm').value.split(/[,\s;]+/).map(x=>x.trim()).filter(Boolean),on=$('#wOn').checked,freq=$('#wFreq').value,mday=+$('#wDay').value||11,er=$('#wErr');er.textContent='';
   const bad=emails.filter(e=>!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));if(bad.length){er.textContent='כתובת לא תקינה: '+bad[0];return}
   if((on||test)&&!emails.length){er.textContent='צריך לפחות כתובת אחת.';return}
   btn.disabled=true;const lbl=btn.textContent;btn.textContent=test?'שולח…':'שומר…';
-  try{const r=await Sync.call({action:'weekly',emails,on,test,freq,app:APP_URL});
+  try{const r=await Sync.call({action:'weekly',emails,on,test,freq,mday,app:APP_URL});
     if(!r.ok){er.textContent=r.err==='action'?'הסקריפט בגיליון ישן. עדכן אותו לפי ההוראות למעלה.':r.err==='server'?'הסקריפט עוד לא קיבל הרשאה לשלוח מיילים. בעורך Apps Script בחר בפונקציה authorize, לחץ Run ואשר, ואז פרסם גרסה חדשה.':errText(new Error(r.err));}
-    else{const fr=r.freq||freq;change(()=>{S.weekly={emails:r.emails,on:r.on,freq:fr}},{cfg:true,undo:false});toast(test?`נשלח מייל לדוגמה ל־${r.emails.join(', ')}`:r.on?(fr==='month'?'הסיכום יישלח ב־1 לכל חודש ב־8:00':fr==='week'?'הסיכום יישלח כל יום ראשון ב־8:00':'יישלח סיכום חודשי ב־1 לחודש וסיכום שבועי בכל יום ראשון'):'הסיכום במייל כבוי');}
+    else{const fr=r.freq||freq,md=r.mday||mday;change(()=>{S.weekly={emails:r.emails,on:r.on,freq:fr,mday:md}},{cfg:true,undo:false});toast(test?`נשלח מייל לדוגמה ל־${r.emails.join(', ')}`:r.on?(fr==='month'?`הסיכום יישלח ב־${md} לכל חודש ב־8:00`:fr==='week'?'הסיכום יישלח כל יום ראשון ב־8:00':`יישלח סיכום חודשי ב־${md} לחודש וסיכום שבועי בכל יום ראשון`):'הסיכום במייל כבוי');}
   }catch(e){er.textContent=errText(e)}
   btn.disabled=false;btn.textContent=lbl;
 }
