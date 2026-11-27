@@ -1,7 +1,7 @@
 /* VOICE everyday money app for a household: calm, exact, friendly
    IDEA a bank's app crossed with a spreadsheet you can touch
    PICTURE the month's balance on a green band, budget bars, six-month bars, receipt thumbnails
-   COLOUR white cards on mist, ink #0b0b10, signal green #00a862, amber for warnings, red only for overspend
+   COLOUR warm linen page, dusk-ink hero, clay accent. Teal only means money in. Red only means overspend.
    TYPE Rubik 500/700 display + Assistant text, both Hebrew
    LAYOUT phone: green app bar and hero, stacked cards, bottom tabs with a raised add button; desktop: side menu on the right, two-column cards */
 :root{color-scheme:light dark;--bg:light-dark(#ffffff,#0a1a12);--page:light-dark(#f2f8f5,#06110b);--ink:light-dark(#0b0b10,#e6f2ea);--mute:light-dark(#56615b,#9db2a6);--mist:light-dark(#eafaf2,#0f261b);--line:light-dark(#d5e4dc,#1f3b2d);--band:light-dark(#00a862,#0f4a31);--bink:light-dark(#0b0b10,#effaf3);--inc:light-dark(#00804f,#40dc98);--over:light-dark(#d1303a,#ff7077);--warn:light-dark(#c27803,#fbbf24);--field:light-dark(#ffffff,#0a1a12)}
@@ -661,5 +661,75 @@ h2{font-size:18px;letter-spacing:-.02em}
 @media (prefers-contrast: more){
   .card,.btn,.field,.menu a.on{outline:2px solid var(--ink)}
 }
+
+/* ---------- v18: warm palette, budget donut ---------- */
+:root{
+  --bg:light-dark(#fffdf8,#1e1b17);
+  --page:light-dark(#f4efe6,#141210);
+  --ink:light-dark(#1c1916,#f7f1e8);
+  --mute:light-dark(#5c564c,#cfc3b3);
+  --mist:light-dark(#f3ebe0,#2b261f);
+  --line:light-dark(#e5dace,#3d362e);
+  --band:light-dark(#3a2c24,#4a382c);
+  --band-deep:light-dark(#241812,#1a1410);
+  --bink:#fbf6ef;
+  --inc:light-dark(#0f6b5c,#8ee8d4);
+  --accent:light-dark(#b4532a,#f0a06a);
+  --focus:light-dark(#1d4ed8,#93c5fd);
+  --over:light-dark(#b4232c,#ff948c);
+  --warn:light-dark(#8a5a00,#f5c56b);
+}
+body{background:
+  radial-gradient(70% 32% at 100% -8%, color-mix(in srgb,var(--accent) 18%,transparent), transparent 55%),
+  var(--page)}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,textarea:focus-visible{outline-color:var(--focus)}
+.appbar{background:var(--band-deep)}
+.hero:not(.photo){
+  background:transparent;
+  box-shadow:none;
+  padding:14px 14px 6px;
+  color:var(--ink);
+}
+.hero:not(.photo) .in{
+  background:
+    radial-gradient(90% 80% at 100% 0%, #8d4e34 0%, transparent 52%),
+    linear-gradient(165deg,#4a3428 0%,#241812 74%);
+  color:#fbf6ef;
+  border-radius:28px;
+  padding:22px 18px 16px;
+  box-shadow:0 18px 40px rgba(36,24,18,.22);
+}
+.menu a.on{background:color-mix(in srgb,var(--accent) 16%,var(--bg));color:var(--ink)}
+.menu a.on .ic{color:var(--accent)}
+.tabbar .on,.tabbar .on .ic{color:var(--accent)}
+.fab{background:var(--accent);color:#fff;box-shadow:0 10px 24px color-mix(in srgb,var(--accent) 45%,transparent)}
+.card{box-shadow:0 10px 28px rgba(48,32,18,.07)}
+.piecard .ch{flex-wrap:wrap}
+.piewrap{display:grid;grid-template-columns:minmax(168px,230px) minmax(0,1fr);gap:6px 16px;align-items:center}
+.piebox{position:relative;width:min(230px,78vw);margin-inline:auto}
+.pie{width:100%;height:auto;overflow:visible;display:block}
+.pie path{cursor:pointer;transform-box:view-box;transform-origin:100px 100px;transition:transform .22s ease}
+.pie path:hover,.pie path.on{filter:brightness(1.06)}
+.piecen{position:absolute;inset:26%;display:grid;align-content:center;justify-items:center;text-align:center;pointer-events:none}
+.piecen b{font:700 20px/1.05 Rubik,sans-serif;letter-spacing:-.03em}
+.piecen span{font:700 13px/1.25 Assistant,sans-serif;max-width:9em}
+.piecen small{color:var(--mute);font-size:12px;font-weight:600;line-height:1.35;max-width:11em}
+.pielist{list-style:none;margin:0;padding:0;display:grid;gap:4px;width:100%}
+.pielist button{display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:10px;align-items:center;width:100%;min-height:52px;border:0;border-radius:16px;background:transparent;color:inherit;text-align:start;padding:6px 8px;font:700 16px Assistant,sans-serif;cursor:pointer}
+.pielist button.on{background:var(--mist);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent) 55%,var(--line))}
+.pielist button:hover{background:var(--mist)}
+.pielist button i{width:14px;height:14px;border-radius:50%}
+.pielist button span{display:grid}
+.pielist button small{font-weight:600;color:var(--mute);font-size:13px}
+.pielist button.over small{color:var(--over)}
+.pielist button b{font:700 15px Rubik,sans-serif}
+@media(max-width:640px){.piewrap{grid-template-columns:1fr}}
+@media (prefers-color-scheme: dark){
+  .hero:not(.photo) .in{box-shadow:0 18px 40px rgba(0,0,0,.35)}
+  .piecen small,.pielist button small{color:#ddd2c4}
+}
+:root[data-theme=dark] .piecen small,:root[data-theme=dark] .pielist button small{color:#ddd2c4}
+:root[data-theme=light] .piecen small,:root[data-theme=light] .pielist button small{color:#5c564c}
+
 
 

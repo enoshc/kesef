@@ -442,17 +442,49 @@ function renderGoal(){
   $('#gNote').textContent=!g?'הגדר יעד חודשי כדי לעקוב אחרי ההתקדמות.':!miss?`עמדת ביעד${sv>g?` ואף עברת אותו ב־${fmt(sv-g)}`:''}.`:left>=miss?`חסרים ${fmt(miss)}. היתרה שלך החודש (${fmt(left)}) מכסה את זה, החלק המקווקו מראה כמה תגיע אם תעביר.`:left>0?`חסרים ${fmt(miss)}. גם אם תעביר את כל היתרה (${fmt(left)}) עוד יחסרו ${fmt(miss-left)}.`:`חסרים ${fmt(miss)}, ואין כרגע יתרה פנויה החודש.`;
   $('#gHist').innerHTML=[0,1,2,3,4,5].map(i=>{const k=shiftYm(cur,i-5),s2=savedIn(k),ok=g&&s2>=g;return `<div class="${ok?'ok':''}${k===cur?' now':''}" title="${esc(MN[mIdx(k)]+': '+fmt(s2))}"><span></span>${MS[mIdx(k)]}</div>`}).join('');
 }
-function renderCats(){
-  const cur=ui.cur,sal=salary(cur);
-  const rows=exps().map(c=>({c,s:spent(cur,c.id),b:budgetOf(cur,c)})).filter(r=>r.s||r.b).sort((a,b)=>b.s-a.s||b.b-a.b);
-  const top=rows.slice(0,5),more=rows.length-top.length;
-  const maxS=Math.max(1,...rows.map(r=>r.s));
-  $('#catHint').textContent=sal?'הקו מסמן את התקציב מתוך המשכורת.':'בלי משכורת מוצגות רק ההוצאות.';
-  const rowHtml=r=>{const s=Math.max(0,r.s),den=r.b?Math.max(r.b,s):maxS,over=r.b&&r.s>r.b+.5;const note=r.s<0?'הזיכויים גדולים מההוצאות':r.b?(over?`חריגה של ${fmt(r.s-r.b)}`:`נשארו ${fmt(r.b-r.s)} מתוך ${fmt(r.b)}`):r.c.sav?'חיסכון':'ללא תקציב';
-    return `<div class="cr${over?' over':''}"><span class="cn"><i style="background:${col(r.c)}"></i>${esc(r.c.name)}</span><div class="tr" role="img" aria-label="${esc(r.c.name)}, ${esc(fmt(r.s))}"><b style="width:${(s/den*100).toFixed(1)}%;background:${col(r.c)}"></b>${r.b?`<u style="inset-inline-start:calc(${(r.b/den*100).toFixed(1)}% - 1px)"></u>`:''}</div><span class="cv">${fmt(r.s)}<small>${esc(note)}</small></span></div>`};
-  $('#cats').innerHTML=top.length?top.map(rowHtml).join(''):'<p class="empty">אין הוצאות בחודש הזה.</p>';
-  const cm=$('#catMore');if(cm){cm.hidden=!more;cm.innerHTML=more?`<a href="#budget">ועוד ${more} בתקציב</a>`:''}
+function renderCats(){paintPie('home')}
+let pieMode='plan',pieSel='';
+function donutD(a0,a1){
+  const cx=100,cy=100,ro=76,ri=48,tau=Math.PI*2,sw=a1-a0;
+  if(sw>=tau-.001)return {d:`M ${cx+ro} ${cy} A ${ro} ${ro} 0 1 1 ${cx-ro} ${cy} A ${ro} ${ro} 0 1 1 ${cx+ro} ${cy} M ${cx+ri} ${cy} A ${ri} ${ri} 0 1 0 ${cx-ri} ${cy} A ${ri} ${ri} 0 1 0 ${cx+ri} ${cy}`,even:true};
+  const pt=(r,a)=>[cx+Math.cos(a)*r,cy+Math.sin(a)*r],large=sw>Math.PI?1:0;
+  const [x0,y0]=pt(ro,a0),[x1,y1]=pt(ro,a1),[x2,y2]=pt(ri,a1),[x3,y3]=pt(ri,a0);
+  return {d:`M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${ro} ${ro} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} L ${x2.toFixed(2)} ${y2.toFixed(2)} A ${ri} ${ri} 0 ${large} 0 ${x3.toFixed(2)} ${y3.toFixed(2)} Z`,even:false};
 }
+function pieParts(mode,limit){
+  const sal=salary(ui.cur);
+  let rows=exps().map(c=>{const pct=+c.pct||0,plan=sal*pct/100,got=Math.max(0,spent(ui.cur,c.id)),v=mode==='plan'?(sal?plan:pct):got;
+    return {id:c.id,name:c.name,color:col(c),plan,got,pct,v,free:false,more:false}}).filter(r=>r.v>0.5);
+  if(mode==='plan'){const free=Math.max(0,100-exps().reduce((s,c)=>s+(+c.pct||0),0));
+    if(free>0.5)rows.push({id:'free',name:'נשאר חופשי',color:'#c4b6a4',plan:sal*free/100,got:0,pct:free,v:sal?sal*free/100:free,free:true,more:false})}
+  rows.sort((a,b)=>(a.free?1:0)-(b.free?1:0)||b.v-a.v);
+  if(limit&&rows.filter(r=>!r.free).length>limit){const real=rows.filter(r=>!r.free),head=real.slice(0,limit-1),rest=real.slice(limit-1);
+    head.push({id:'more',name:`עוד ${rest.length}`,color:'#8d8274',plan:rest.reduce((s,r)=>s+r.plan,0),got:rest.reduce((s,r)=>s+r.got,0),pct:0,v:rest.reduce((s,r)=>s+r.v,0),free:false,more:true});rows=head}
+  return {rows,sum:rows.reduce((s,r)=>s+r.v,0)||1,sal};
+}
+function paintPie(kind){
+  const home=kind==='home',svg=$(home?'#homePie':'#budPie'),cen=$(home?'#homePieCen':'#budPieCen'),list=$(home?'#homePieList':'#budPieList');
+  if(!svg||!cen||!list)return;
+  const mode=home?'spent':pieMode,{rows,sum,sal}=pieParts(mode,home?6:0);
+  if(home){$('#catHint').textContent=rows.length?'לוחצים על פלח או על שם, ורואים כמה יצא מול התקציב.':'עוד אין הוצאות בחודש הזה.'}
+  else{$('#pieHint').textContent=!rows.length?'קבעו אחוז לכל קטגוריה למטה, והעוגה תתחלק לפי המשכורת.':mode==='plan'?(sal?'כל פלח הוא חלק מהמשכורת. לחיצה מראה כמה נשאר.':'אין משכורת החודש, אז הגודל הוא לפי האחוז שקבעת.'):'כל פלח הוא מה שיצא בפועל. חריגה כתובה ליד השם, לא רק בצבע.'}
+  if(!rows.length){svg.innerHTML='';cen.innerHTML='<b>—</b><span>אין נתונים</span>';list.innerHTML=`<li class="empty">${home?'אין הוצאות בחודש הזה.':'אין עדיין חלוקה.'}</li>`;return}
+  let ang=-Math.PI/2;const gap=rows.length>1?.04:0;
+  const parts=rows.map(r=>{const sw=r.v/sum*Math.PI*2,a0=ang+(rows.length>1?gap/2:0),a1=ang+sw-(rows.length>1?gap/2:0);ang+=sw;return {...r,a0,a1:Math.max(a0+.01,a1)}});
+  svg.innerHTML=parts.map(p=>{const mid=(p.a0+p.a1)/2,pull=p.id===pieSel?8:0,dx=(Math.cos(mid)*pull).toFixed(2),dy=(Math.sin(mid)*pull).toFixed(2),sh=donutD(p.a0,p.a1);
+    return `<path d="${sh.d}" fill="${p.color}" ${sh.even?'fill-rule="evenodd"':''} data-pie="${esc(p.id)}" data-home="${home?1:0}" class="${p.id===pieSel?'on':''}" style="transform:translate(${dx}px,${dy}px)"><title>${esc(p.name)} ${esc(fmt(p.v))}</title></path>`}).join('');
+  if(show)cen.innerHTML=`<b>${esc(fmt(mode==='plan'&&show.plan?show.plan:show.v))}</b><span>${esc(show.name)}</span>`;
+  else cen.innerHTML=`<b>${esc(mode==='plan'&&!sal?Math.round(rows.filter(r=>!r.free).reduce((s,r)=>s+r.pct,0))+'%':fmt(sum))}</b><span>${home||mode==='spent'?'יצא החודש':sal?'המשכורת':'החלוקה'}</span>`;
+  list.innerHTML=parts.map(p=>{const over=p.plan>1&&p.got>p.plan+.5;
+    const sub=p.more?'לכל הקטגוריות בתקציב':p.free?`${Math.round(p.pct)}% לא משויך`:mode==='plan'?`${Math.round(p.pct)}%${p.plan?` · תקציב ${fmt(p.plan)}`:''}${over?` · חריגה ${fmt(p.got-p.plan)}`:(p.plan>1?` · נשארו ${fmt(Math.max(0,p.plan-p.got))}`:'')}`:(p.plan>1?(over?`חריגה ${fmt(p.got-p.plan)} מתוך ${fmt(p.plan)}`:`נשארו ${fmt(Math.max(0,p.plan-p.got))} מתוך ${fmt(p.plan)}`):'בלי תקציב לחודש');
+    return `<li><button type="button" data-pie="${esc(p.id)}" data-home="${home?1:0}" class="${p.id===pieSel?'on':''}${over?' over':''}" aria-pressed="${p.id===pieSel}"><i style="background:${p.color}" aria-hidden="true"></i><span>${esc(p.name)}<small>${esc(sub)}</small></span><b>${esc(p.free&&!sal?Math.round(p.pct)+'%':fmt(p.v))}</b></button></li>`}).join('');
+}
+function pickPie(id){
+  if(id==='more'){pieMode='spent';pieSel='';location.hash='#budget';return}
+  pieSel=pieSel===id?'':id;paintPie('home');paintPie('bud');
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-pie]');if(b)pickPie(b.dataset.pie)});
+$('#pieMode').addEventListener('click',e=>{const v=e.target.closest('button')?.dataset.v;if(!v||v===pieMode)return;pieMode=v;pieSel='';setSeg($('#pieMode'),v);paintPie('bud')});
 const svg=$('#chart');
 const niceStep=x=>{const p=10**Math.floor(Math.log10(x||1)),f=x/p;return (f<=1?1:f<=2?2:f<=5?5:10)*p};
 function drawChart(){
@@ -535,6 +567,7 @@ function renderBudget(){
 <td data-a="a" data-l="בפועל" class="num">${fmt(spent(ui.cur,c.id))}</td>
 <td data-a="x" class="x"><button data-cdel aria-label="מחק קטגוריה"><svg class="ic"><use href="#i-x"/></svg></button></td></tr>`}).join('');
   const ps=$('#pctSum');ps.textContent=`מוקצה ${sum}% מהמשכורת`+(sum<100?`, ${100-sum}% נשארים חופשיים.`:sum>100?', יותר מ־100%. כדאי להוריד באחת הקטגוריות.':'. כל השקל מתוכנן.');ps.className='hint'+(sum>100?' bad':'');
+  setSeg($('#pieMode'),pieMode);paintPie('bud');
   $('#setI').innerHTML=incs().map(c=>`<tr data-cid="${esc(c.id)}">
 <td data-a="k"><input type="color" data-k="color" value="${col(c)}" aria-label="צבע"></td>
 <td data-a="n"><input data-k="name" value="${esc(c.name)}" maxlength="40" aria-label="שם קטגוריה"></td>

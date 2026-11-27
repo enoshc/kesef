@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=17">
+<link rel="stylesheet" href="app.css?v=18">
 </head>
 <body>
 <a class="skip" href="#main">דילוג לתוכן</a>
@@ -125,10 +125,15 @@
         <div class="ghist" id="gHist"></div>
       </div>
       <div class="card span2">
-        <div class="ch"><h2>לאן הולך הכסף</h2><a href="#budget" class="lnk">תקציב</a></div>
+        <div class="ch"><h2>לאן הולך הכסף</h2><a href="#budget" class="lnk">העוגה המלאה</a></div>
         <p class="hint" id="catHint"></p>
-        <div id="cats"></div>
-        <p class="moreline" id="catMore" hidden></p>
+        <div class="piewrap" id="cats">
+          <div class="piebox">
+            <svg id="homePie" class="pie" viewBox="0 0 200 200" aria-hidden="true"></svg>
+            <div class="piecen" id="homePieCen" aria-hidden="true"></div>
+          </div>
+          <ul class="pielist" id="homePieList"></ul>
+        </div>
       </div>
       <div class="card" id="homeChart" hidden>
         <h2>חצי שנה אחורה</h2>
@@ -185,8 +190,25 @@
 
   <section class="view" data-view="budget" hidden>
     <div class="pad grid2">
+      <div class="card span2 piecard">
+        <div class="ch">
+          <h2>העוגה של החודש</h2>
+          <div class="seg" id="pieMode" role="group" aria-label="מה העוגה מראה">
+            <button type="button" data-v="plan" aria-pressed="true">התקציב</button>
+            <button type="button" data-v="spent" aria-pressed="false">מה שיצא</button>
+          </div>
+        </div>
+        <p class="hint" id="pieHint"></p>
+        <div class="piewrap">
+          <div class="piebox">
+            <svg id="budPie" class="pie" viewBox="0 0 200 200" aria-hidden="true"></svg>
+            <div class="piecen" id="budPieCen" aria-hidden="true"></div>
+          </div>
+          <ul class="pielist" id="budPieList"></ul>
+        </div>
+      </div>
       <div class="card span2">
-        <h2>חלוקת המשכורת</h2>
+        <h2>עריכת החלוקה</h2>
         <p class="hint" id="pctSum"></p>
         <div class="sheet"><table class="set"><thead><tr><th>צבע</th><th>הוצאה</th><th>סוג</th><th style="text-align:end">% מהמשכורת</th><th style="text-align:end">תקציב</th><th style="text-align:end">בפועל</th><th></th></tr></thead><tbody id="setE"></tbody></table></div>
         <div class="srow"><span></span><button class="btn sm" id="addE">+ קטגוריית הוצאה</button></div>
@@ -516,6 +538,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=27"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>
