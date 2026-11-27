@@ -79,12 +79,12 @@ const LS='kesef-li-v1',LSY='kesef-sync-v1',LSU='kesef-ui-v1';
 let S=blank(),sample=false,hist=[];
 let SY={on:false,url:'',key:'',since:0,dirty:[],idirty:[],cfgDirty:false,last:0,err:'',sheet:'',sv:0};
 const wide=matchMedia('(min-width:900px)').matches;
-const ui={view:'home',cur:nowYm,scope:'month',typeF:'all',catF:'',tagF:'',q:'',sortK:'d',sortD:-1,mode:wide?'grid':'list',me:'',dev:'',read:0,ss:{int:8,idle:0,info:true},bg:{mode:'hero',int:10},push:{on:false,cov:0,prefs:{tx:true,msg:true,budget:true,rec:true}}};
+const ui={view:'home',cur:nowYm,scope:'month',typeF:'all',catF:'',tagF:'',q:'',sortK:'d',sortD:-1,mode:wide?'grid':'list',me:'',dev:'',read:0,ss:{int:8,idle:0,info:true},bg:{mode:'hero',int:10},push:{on:false,cov:0,prefs:{tx:true,msg:true,budget:true,rec:true,bank:true}}};
 function load(){
   let raw=null;try{raw=localStorage.getItem(LS)}catch{}
   if(raw){try{S=norm(JSON.parse(raw));sample=false}catch{S=norm(sampleData());sample=true}}else{S=norm(sampleData());sample=true}
   try{const y=JSON.parse(localStorage.getItem(LSY)||'null');if(y&&typeof y==='object')SY={...SY,...y,dirty:Array.isArray(y.dirty)?y.dirty:[],idirty:Array.isArray(y.idirty)?y.idirty:[]}}catch{}
-  try{const u=JSON.parse(localStorage.getItem(LSU)||'null');if(u){if(u.mode==='list'||u.mode==='grid')ui.mode=u.mode;ui.me=String(u.me||'').slice(0,40);ui.dev=String(u.dev||'');ui.read=+u.read||0;if(u.ss)ui.ss={int:clamp(+u.ss.int||8,3,120),idle:clamp(+u.ss.idle||0,0,60),info:u.ss.info!==false};if(u.push&&typeof u.push==='object')ui.push={on:!!u.push.on,cov:+u.push.cov||0,prefs:{tx:u.push.prefs?.tx!==false,msg:u.push.prefs?.msg!==false,budget:u.push.prefs?.budget!==false,rec:u.push.prefs?.rec!==false}};if(u.bg)ui.bg={mode:['hero','app','off'].includes(u.bg.mode)?u.bg.mode:'hero',int:clamp(+u.bg.int||10,3,300)}}}catch{}
+  try{const u=JSON.parse(localStorage.getItem(LSU)||'null');if(u){if(u.mode==='list'||u.mode==='grid')ui.mode=u.mode;ui.me=String(u.me||'').slice(0,40);ui.dev=String(u.dev||'');ui.read=+u.read||0;if(u.ss)ui.ss={int:clamp(+u.ss.int||8,3,120),idle:clamp(+u.ss.idle||0,0,60),info:u.ss.info!==false};if(u.push&&typeof u.push==='object')ui.push={on:!!u.push.on,cov:+u.push.cov||0,prefs:{tx:u.push.prefs?.tx!==false,msg:u.push.prefs?.msg!==false,budget:u.push.prefs?.budget!==false,rec:u.push.prefs?.rec!==false,bank:u.push.prefs?.bank!==false}};if(u.bg)ui.bg={mode:['hero','app','off'].includes(u.bg.mode)?u.bg.mode:'hero',int:clamp(+u.bg.int||10,3,300)}}}catch{}
   if(!/^[a-z0-9]{8,}$/.test(ui.dev))ui.dev=rid(10);
 }
 let saveT=null,storageOk=true;
@@ -501,7 +501,7 @@ function syncStatusHtml(){const pend=SY.dirty.length+SY.idirty.length+(SY.cfgDir
   return `<div class="status${bad?' err':''}" id="syncStat"><svg class="ic"><use href="#i-${bad?'alert':'check'}"/></svg><div><b>${bad?'הסנכרון נכשל':syncState==='busy'?'מסנכרן…':'מחובר לגיליון משותף'}</b><small>${esc(bad?SY.err:`עודכן ${agoText(SY.last)}${pend?`, ${pend} שינויים מחכים`:''}`)}</small></div></div>`}
 function renderSync(){
   const b=$('#syncBody'),keep={},ae=document.activeElement,aid=ae&&b.contains(ae)?ae.id:'',selS=aid&&ae.selectionStart!=null?ae.selectionStart:null,selE=aid&&ae.selectionEnd!=null?ae.selectionEnd:null;
-  ['wEm','wOn','wFreq','wDay','joinCode','joinMerge','gsUrl'].forEach(id=>{const el=$('#'+id);if(el)keep[id]=el.type==='checkbox'?el.checked:el.value});
+  ['wEm','wOn','wFreq','wDay','joinCode','joinMerge','gsUrl','ingTest'].forEach(id=>{const el=$('#'+id);if(el)keep[id]=el.type==='checkbox'?el.checked:el.value});
   renderSyncInner(b);renderedSv=SY.sv;
   Object.keys(keep).forEach(id=>{const el=$('#'+id);if(!el)return;if(el.type==='checkbox'){if(!el.disabled)el.checked=keep[id]}else el.value=keep[id]});
   if(aid){const el=$('#'+aid);if(el){el.focus({preventScroll:true});try{if(selS!=null)el.setSelectionRange(selS,selE)}catch{}}}
@@ -512,9 +512,10 @@ function renderSyncInner(b){
 ${syncStatusHtml()}
 <p class="hint">כל שינוי שאתה עושה נשלח לגיליון, והאפליקציה בודקת עדכונים מהמכשירים האחרים כל 20 שניות. אפשר גם לערוך ישירות בגיליון, והשינויים יגיעו לאפליקציה.</p>
 <div class="btnrow"><button class="btn solid" data-act="sync-now">סנכרן עכשיו</button>${SY.sheet&&/^https:\/\//.test(SY.sheet)?`<a class="btn" href="${esc(SY.sheet)}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-sheet"/></svg>פתח את הגיליון</a>`:''}</div></div>
-${SY.sv&&SY.sv<8?`<div class="card"><h2>עדכון הסקריפט בגיליון</h2><p class="hint">יש גרסה חדשה של הסקריפט, עם ${[SY.sv<3?'תמונות והודעות':'',SY.sv<4?'הערות':'',SY.sv<5?'תגיות':'',SY.sv<7?'סיכום חודשי ושבועי במייל':'','התראות בטלפון'].filter(Boolean).join(', ')}. עד שתעדכן, הן נשמרות רק במכשיר ויישלחו אחרי העדכון. מעדכנים פעם אחת, ממכשיר אחד:</p><ol class="steps"><li><div><b>פותחים את עורך הסקריפטים</b><p>בגיליון: <kbd>Extensions</kbd> ← <kbd>Apps Script</kbd>.</p></div></li><li><div><b>מחליפים את הקוד</b><p>מוחקים את כל הקוד הישן, מדביקים את החדש ושומרים.</p><button class="btn solid sm" data-act="copy-gs">העתק את הקוד החדש</button></div></li><li><div><b>מאשרים שליחת מיילים</b><p>למעלה בעורך, בתפריט שליד <kbd>Debug</kbd> בוחרים את הפונקציה <kbd>authorize</kbd> ולוחצים <kbd>Run</kbd>. מאשרים את ההרשאות כמו בפעם הראשונה.</p></div></li><li><div><b>מפרסמים גרסה חדשה</b><p><kbd>Deploy</kbd> ← <kbd>Manage deployments</kbd> ← סמל העיפרון ← ב־<kbd>Version</kbd> בוחרים <kbd>New version</kbd> ← <kbd>Deploy</kbd>. הכתובת לא משתנה ואין צורך לחבר מחדש.</p></div></li></ol><button class="btn sm" data-act="sync-now">בדוק שוב</button></div>`:''}
+${SY.sv&&SY.sv<9?`<div class="card"><h2>עדכון הסקריפט בגיליון</h2><p class="hint">יש גרסה חדשה של הסקריפט, עם ${[SY.sv<3?'תמונות והודעות':'',SY.sv<4?'הערות':'',SY.sv<5?'תגיות':'',SY.sv<7?'סיכום חודשי ושבועי במייל':'',SY.sv<8?'התראות בטלפון':'','קליטה אוטומטית של חיובים מהודעות הבנק והאשראי'].filter(Boolean).join(', ')}. עד שתעדכן, הן נשמרות רק במכשיר ויישלחו אחרי העדכון. מעדכנים פעם אחת, ממכשיר אחד:</p><ol class="steps"><li><div><b>פותחים את עורך הסקריפטים</b><p>בגיליון: <kbd>Extensions</kbd> ← <kbd>Apps Script</kbd>.</p></div></li><li><div><b>מחליפים את הקוד</b><p>מוחקים את כל הקוד הישן, מדביקים את החדש ושומרים.</p><button class="btn solid sm" data-act="copy-gs">העתק את הקוד החדש</button></div></li><li><div><b>מאשרים שליחת מיילים</b><p>למעלה בעורך, בתפריט שליד <kbd>Debug</kbd> בוחרים את הפונקציה <kbd>authorize</kbd> ולוחצים <kbd>Run</kbd>. מאשרים את ההרשאות כמו בפעם הראשונה.</p></div></li><li><div><b>מפרסמים גרסה חדשה</b><p><kbd>Deploy</kbd> ← <kbd>Manage deployments</kbd> ← סמל העיפרון ← ב־<kbd>Version</kbd> בוחרים <kbd>New version</kbd> ← <kbd>Deploy</kbd>. הכתובת לא משתנה ואין צורך לחבר מחדש.</p></div></li></ol><button class="btn sm" data-act="sync-now">בדוק שוב</button></div>`:''}
 ${weeklyCard()}
 ${pushCard()}
+${autoCard()}
 <div class="card"><h2>הוספת שותף</h2><p class="hint">שלח את הקוד הזה למי שמנהל איתך את החשבון. הוא פותח את האפליקציה, נכנס לסנכרון משותף ובוחר "הצטרפות עם קוד". מי שיש לו את הקוד יכול לראות ולשנות את הנתונים, אז שלח אותו רק למי שאתה סומך עליו.</p>
 <textarea class="field code" readonly rows="3" id="invTxt">${esc(inviteCode())}</textarea>
 <div class="btnrow"><button class="btn solid" data-act="share-code">שלח קוד הצטרפות</button><button class="btn" data-act="copy-code">העתק</button></div></div>
@@ -731,6 +732,14 @@ const ACT={
     const imgs=[...new Set(S.tx.map(t=>t.img).concat(S.items.map(i=>i.img)).filter(Boolean))];for(const k of imgs){try{await IDB.del('i:'+k)}catch{}}
     PUSH.disable();IDB.del('sync').catch(()=>{});SY={on:false,url:'',key:'',since:0,dirty:[],idirty:[],cfgDirty:false,last:0,err:'',sheet:'',sv:0};S=blank();sample=false;hist=[];ui.read=0;
     URLS.forEach(u=>URL.revokeObjectURL(u));URLS.clear();persistNow();setSync('off');render();toast('המכשיר נותק והנתונים נמחקו ממנו')},
+  'ing-get':async(btn)=>{btn.disabled=true;try{const r=await Sync.call({action:'ing-token'});if(!r.ok)throw new Error(r.err||'err');ING.tok=r.tok;renderSync()}catch(e){toast(errText(e));btn.disabled=false}},
+  'ing-rotate':async()=>{if(!(await ask('להחליף את המפתח?','קיצורי הדרך הקיימים יפסיקו לעבוד עד שתדביק בהם את המפתח החדש. שווה לעשות את זה אם המפתח הגיע למישהו אחר.','החלף')))return;try{const r=await Sync.call({action:'ing-token',rotate:1});if(!r.ok)throw new Error(r.err||'err');ING.tok=r.tok;renderSync();toast('נוצר מפתח חדש. עדכן אותו בקיצור הדרך')}catch(e){toast(errText(e))}},
+  'ing-copy-url':()=>copyText(SY.url,'הכתובת הועתקה','כתובת'),
+  'ing-copy-tok':()=>copyText(ING.tok,'המפתח הועתק','מפתח'),
+  'ing-copy-json':()=>copyText(JSON.stringify({action:'ingest',tok:ING.tok,text:'<כאן קלט קיצור הדרך>'},null,1),'התבנית הועתקה','גוף הבקשה'),
+  'ing-copy-and':()=>copyText(JSON.stringify({action:'ingest',tok:ING.tok,text:'[sms_message]',src:'SMS'}),'גוף הבקשה למקרודרויד הועתק','גוף הבקשה'),
+  'ing-test':async(btn)=>{const text=$('#ingTest').value.trim();if(!text){toast('הדבק קודם הודעה מהבנק או מחברת האשראי');return}btn.disabled=true;
+    try{const r=await Sync.call({action:'ing-test',text});if(!r.ok)throw new Error(r.err||'err');ING.res=r;renderSync()}catch(e){toast(errText(e))}finally{btn.disabled=false}},
   'copy-gs':()=>{if(!GS){toast('הקוד עוד לא נטען, נסה שוב בעוד רגע');return}copyText(GS,'הקוד הועתק. הדבק אותו בעורך של Apps Script','קוד הסקריפט')},
   'show-gs':()=>{if(GS)showText('קוד הסקריפט','מעתיקים את כל הטקסט ומדביקים בעורך של Apps Script.',GS)},
   connect:async(btn)=>{const url=$('#gsUrl').value.trim(),er=$('#gsErr');er.textContent='';try{sessionStorage.setItem('kesef-url',url)}catch{}
@@ -1175,6 +1184,39 @@ const PUSH={
   },
   async refresh(){if(!ui.push.on||!SY.on||!this.supported()||Notification.permission!=='granted')return;if(ui.push.cov-Date.now()/1000>20*86400)return;try{await this.register()}catch{}}
 };
+let ING={tok:'',res:null};
+function ingResHtml(){const r=ING.res;if(!r)return '';
+  if(r.skip)return `<p class="hint bad">ההודעה הזו לא תיקלט: ${esc(r.why||r.skip)}.</p>`;
+  const p=r.p;return `<div class="status"><svg class="ic"><use href="#i-check"/></svg><div><b>${p.t==='inc'?'זיכוי':'חיוב'} של ${p.cur==='ILS'?'₪'+esc((+p.a).toLocaleString('he-IL',{maximumFractionDigits:2})):esc(p.a+' '+p.cur)+' (יומר לשקלים לפי שער בנק ישראל)'}</b><small>${esc([p.n||'בלי שם בית עסק',r.cat?'← '+r.cat:'',p.card?'כרטיס/חשבון '+p.card:'',p.d,p.inst].filter(Boolean).join(' · '))}</small></div></div>`}
+function autoCard(){
+  const old=SY.sv&&SY.sv<9;
+  let body;
+  if(old)body='<p class="hint bad">צריך קודם לעדכן את הסקריפט בגיליון (ההוראות למעלה).</p>';
+  else if(!ING.tok)body='<div class="btnrow"><button class="btn solid sm" data-act="ing-get">הפעל וקבל מפתח לקיצור הדרך</button></div>';
+  else body=`<label class="hint" style="display:block;margin:8px 0 4px">כתובת (URL)</label><textarea class="field code" readonly rows="2">${esc(SY.url)}</textarea>
+<label class="hint" style="display:block;margin:8px 0 4px">מפתח (tok), מאפשר רק להוסיף תנועות</label><textarea class="field code" readonly rows="1">${esc(ING.tok)}</textarea>
+<div class="btnrow"><button class="btn sm" data-act="ing-copy-url">העתק כתובת</button><button class="btn sm" data-act="ing-copy-tok">העתק מפתח</button><button class="btn danger sm" data-act="ing-rotate">החלף מפתח</button></div>
+<h3 style="margin:16px 0 6px">אייפון: אוטומציה בקיצורים (פעם אחת, 3 דקות, iOS 17 ומעלה)</h3>
+<p class="hint">שמות הכפתורים כתובים באנגלית, בעברית הם מתורגמים באופן דומה.</p>
+<ol class="steps">
+<li><div><b>אוטומציה חדשה</b><p>אפליקציית Shortcuts ‏(קיצורים) ← <kbd>Automation</kbd> ← <kbd>+</kbd> ← <kbd>Message</kbd> (הודעה).</p></div></li>
+<li><div><b>מתי להפעיל</b><p>ב־<kbd>Message Contains</kbd> כותבים את 4 הספרות האחרונות של הכרטיס (למשל 1234), כדי שרק הודעות על הכרטיס שלך יפעילו את זה. בוחרים <kbd>Run Immediately</kbd> ומכבים <kbd>Notify When Run</kbd>. לכל כרטיס ולכל חשבון בנק עושים אוטומציה נפרדת.</p></div></li>
+<li><div><b>הפעולה</b><p><kbd>New Blank Automation</kbd> ← מוסיפים <kbd>Get Contents of URL</kbd> ומדביקים בו את הכתובת. פותחים את החץ: <kbd>Method</kbd> = POST, <kbd>Request Body</kbd> = JSON, ומוסיפים 3 שדות מסוג Text:<br><kbd>action</kbd> = ingest<br><kbd>tok</kbd> = המפתח<br><kbd>text</kbd> = המשתנה <kbd>Shortcut Input</kbd>, ולוחצים עליו כדי לבחור <kbd>Content</kbd>.</p></div></li>
+<li><div><b>זהו</b><p>בקנייה הבאה תגיע התראה תוך כמה שניות, והתנועה תופיע כאן ובגיליון. כדי לבדוק עכשיו, בקש ממישהו לשלוח לך SMS כמו "עסקה בסך 1 ש&quot;ח ב-בדיקה בכרטיס 1234", ואז מחק את תנועת הבדיקה.</p></div></li>
+</ol>
+<h3 style="margin:16px 0 6px">אנדרואיד: MacroDroid (חינם)</h3>
+<p class="hint">טריגר <kbd>SMS Received</kbd> (תוכן מכיל את 4 הספרות), או <kbd>Notification Received</kbd> מאפליקציית מקס/כאל/ישראכרט. פעולה <kbd>HTTP Request</kbd>: POST לכתובת, Content type ‏application/json, וגוף הבקשה:</p>
+<div class="btnrow"><button class="btn sm" data-act="ing-copy-and">העתק גוף בקשה</button></div>
+<p class="hint">בטריגר של התראה מחליפים את [sms_message] ב־[notification].</p>
+<h3 style="margin:16px 0 6px">בדיקה בלי טלפון</h3>
+<p class="hint">הדבק הודעה אמיתית שקיבלת מהבנק או מחברת האשראי, ותראה איך היא תיקלט. שום דבר לא נשמר.</p>
+<textarea class="field" id="ingTest" rows="3" placeholder="מקס: בכרטיסך המסתיים ב-1234 אושרה עסקה בסך 45.90 ש&quot;ח בשופרסל"></textarea>
+<div class="btnrow"><button class="btn sm" data-act="ing-test">בדוק</button></div>${ingResHtml()}`;
+  return `<div class="card" id="autoCard"><h2><svg class="ic" style="vertical-align:-4px"><use href="#i-bell"/></svg> חיובים נכנסים לבד</h2>
+<p class="hint">בלי לחבר את החשבון ובלי סיסמאות: כל SMS שמגיע מחברת האשראי או מהבנק נשלח לגיליון שלכם, נקלט עם סכום, בית עסק וקטגוריה, וכולם מקבלים התראה. קודי אימות לא נשמרים. החיוב החודשי של הכרטיס בחשבון הבנק מדולג כדי שלא ייספר פעמיים. כל הודעה נרשמת בלשונית "הודעות בנק" בגיליון, כולל מה שדולג. הקטגוריה נקבעת לפי מה שהאפליקציה למדה מהתיקונים שלך.</p>
+<p class="hint">צריך שהשירות יהיה פעיל: בכאל, מקס וישראכרט מפעילים התראות SMS על עסקאות באפליקציה או באתר, ובבנק מפעילים הודעות SMS על פעולות בחשבון (בחלק מהבנקים בתשלום). באייפון חייבים SMS, כי קיצורים לא רואים התראות של אפליקציות אחרות.</p>
+${body}</div>`;
+}
 function pushCard(){
   const old=SY.sv&&SY.sv<8,p=ui.push.prefs,perm=typeof Notification!=='undefined'?Notification.permission:'default',on=ui.push.on&&perm==='granted';
   const iosNo=PUSH.ios()&&!PUSH.standalone();
@@ -1187,7 +1229,7 @@ function pushCard(){
   else action=on?'<p class="okt" style="margin:4px 0 0">פעילות במכשיר הזה</p><div class="btnrow"><button class="btn sm" data-act="push-test">שלח התראת בדיקה</button><button class="btn danger sm" data-act="push-off">כבה את כל ההתראות</button></div>':'<div class="btnrow"><button class="btn solid sm" data-act="push-on">הפעל התראות במכשיר הזה</button></div>';
   return `<div class="card" id="pushCard"><h2><svg class="ic" style="vertical-align:-4px"><use href="#i-bell"/></svg> התראות בטלפון</h2>
 <p class="hint">התראות גם כשהאפליקציה סגורה. כל אחד בוחר אצלו מה לקבל, ואפשר לשנות או לכבות כאן בכל רגע.</p>
-${box('tx','כשהשותף מוסיף הוצאה או הכנסה')}${box('msg','הודעה חדשה')}${box('budget','קטגוריה מתקרבת לתקציב או חורגת ממנו')}${box('rec','הוצאה או הכנסה קבועה נכנסה')}
+${box('tx','כשהשותף מוסיף הוצאה או הכנסה')}${box('msg','הודעה חדשה')}${box('budget','קטגוריה מתקרבת לתקציב או חורגת ממנו')}${box('rec','הוצאה או הכנסה קבועה נכנסה')}${box('bank','חיוב או זיכוי שנקלט אוטומטית מהבנק או מהאשראי')}
 <p class="err" id="pErr"></p>${action}</div>`;
 }
 $('#syncBody').addEventListener('change',async e=>{const k=e.target.dataset&&e.target.dataset.pp;if(!k)return;ui.push.prefs[k]=e.target.checked;persistNow();
