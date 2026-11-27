@@ -134,6 +134,10 @@ svg text{font:13px Assistant,sans-serif;fill:var(--mute);paint-order:stroke;stro
 #gFlow:empty{display:none}
 #gSave{margin-top:12px}
 
+.capb{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:10px 0}
+.capb span{display:block;height:100%;background:var(--inc)}
+.capb.hot span{background:var(--warn)}
+.capb.over span{background:var(--over)}
 .biz summary{display:flex;justify-content:space-between;gap:12px;align-items:baseline;cursor:pointer}
 .biz summary small{color:var(--mute);font-weight:400}
 .paper{background:#fff;color:#1a1a1a;border:1px solid #ddd;border-radius:16px;padding:22px 18px;margin-bottom:14px;font-size:14px}

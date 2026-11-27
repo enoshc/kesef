@@ -71,11 +71,12 @@ const DOCSEED=[
   {id:'rc1004',n:1004,d:'2026-11-09',who:'אוהד יחזקאלי',what:'עריכת תמונות',qty:1,a:300,pay:'bit',ref:'מס׳ אישור 1007894172064'}
 ];
 function normBiz(b){b=b&&typeof b==='object'?b:{};const email=String(b.email||'').trim().slice(0,80);return {name:String(b.name||'').trim().slice(0,60)||'אנוש כהן',id:String(b.id||'').replace(/\D/g,'').slice(0,9)||'213926223',addr:String(b.addr||'').trim().slice(0,80),phone:String(b.phone||'').replace(/[^\d+\- ]/g,'').slice(0,20),email:/@/.test(email)?email:'tbua.fvi11@gmail.com',bank:String(b.bank||'').replace(/[^\d\-]/g,'').slice(0,20)||'998-23205176',next:clamp(Math.round(+b.next||1),1,999999)}}
-function normDoc(r){if(!r||typeof r!=='object')return null;const id=String(r.id||'').replace(/[^a-z0-9]/gi,'').slice(0,16);if(id.length<6)return null;const a=Math.round(Math.abs(+r.a||0)*100)/100;if(!(a>0)||!(+r.n>0))return null;const pay=['cash','bank','bit','card','paypal','other'].includes(r.pay)?r.pay:'bank';const qty=clamp(Math.round((+r.qty||1)*100)/100,0.01,9999);return {id,n:Math.round(+r.n),d:YMD.test(r.d)?r.d:todayStr,who:String(r.who||'').trim().slice(0,80),whoId:String(r.whoId||'').replace(/\D/g,'').slice(0,9),whoAddr:String(r.whoAddr||'').trim().slice(0,120),what:String(r.what||'').trim().slice(0,240),qty,a,pay,ref:String(r.ref||'').trim().slice(0,80),tx:String(r.tx||'').replace(/[^a-z0-9]/gi,'').slice(0,16),void:r.void?1:0}}
+function normDoc(r){if(!r||typeof r!=='object')return null;const id=String(r.id||'').replace(/[^a-z0-9]/gi,'').slice(0,16);if(id.length<6)return null;const a=Math.round(Math.abs(+r.a||0)*100)/100;if(!(a>0)||!(+r.n>0))return null;const pay=['cash','bank','bit','card','paypal','other'].includes(r.pay)?r.pay:'bank';const qty=clamp(Math.round((+r.qty||1)*100)/100,0.01,9999);return {id,n:Math.round(+r.n),d:YMD.test(r.d)?r.d:todayStr,who:String(r.who||'').trim().slice(0,80),whoId:String(r.whoId||'').replace(/\D/g,'').slice(0,9),whoAddr:String(r.whoAddr||'').trim().slice(0,120),what:String(r.what||'').trim().slice(0,240),qty,a,pay,ref:String(r.ref||'').trim().slice(0,80),tx:String(r.tx||'').replace(/[^a-z0-9]/gi,'').slice(0,16),void:r.void?1:0,copy:r.copy?1:0}}
 function normEx(e){e=e&&typeof e==='object'?e:{};const str=(a,n=30,m=40)=>Array.isArray(a)?[...new Set(a.map(x=>String(x||'').trim().slice(0,m)).filter(Boolean))].slice(0,n):[];
   const bal=e.bal&&YMD.test(e.bal.d||'')&&isFinite(+e.bal.v)?{d:e.bal.d,v:Math.round(+e.bal.v*100)/100}:null;
   const docs=Array.isArray(e.docs)?e.docs.map(normDoc).filter(Boolean).slice(-500):[];
-  const nums=new Set(docs.map(d=>d.n));DOCSEED.forEach(s=>{if(!nums.has(s.n)){const d=normDoc(s);if(d)docs.push(d)}});
+  const nums=new Set(docs.map(d=>d.n));DOCSEED.forEach(s=>{if(!nums.has(s.n)){const d=normDoc({...s,copy:1});if(d)docs.push(d)}});
+  docs.forEach(d=>{if(/^rc100[1-4]$/.test(d.id))d.copy=1});
   docs.sort((a,b)=>a.n-b.n);
   const biz=normBiz(e.biz);const maxN=docs.reduce((m,d)=>Math.max(m,d.n),0);if(biz.next<=maxN)biz.next=maxN+1;
   return {self:str(e.self,6),own:str(e.own,20),nosub:str(e.nosub,80,60),bill:clamp(Math.round(+e.bill||10),1,28),cut:clamp(Math.round(+e.cut||7),1,28),bal,minBal:Math.round(+e.minBal||0),people:str(e.people,40,30),biz,docs}}
@@ -1830,14 +1831,18 @@ function idOk(id){const s=String(id||'').replace(/\D/g,'').padStart(9,'0');if(!/
 function bizCat(){return incs().find(c=>!c.sal&&/עסק|צד|אחר/.test(c.name))||incs().find(c=>!c.sal)||null}
 function docBy(id){return S.ex.docs.find(d=>d.id===id)}
 function docText(r){const b=S.ex.biz,dd=r.d.split('-').reverse().join('/'),qty=r.qty||1;return [`קבלה ${r.n} (מקור)${r.void?' · בוטלה':''}`,b.name,b.email,b.id?`עוסק פטור: ${b.id}`:'','פטור ממע״מ. זו אינה חשבונית מס.',`תאריך: ${dd}`,`לכבוד: ${r.who}`,r.whoId?`ת.ז./ע.מ.: ${r.whoId}`:'',r.whoAddr?`כתובת: ${r.whoAddr}`:'',r.what,`כמות ${qty} · מחיר יחידה ${docMoney(r.a/qty)} · סה״כ ${docMoney(r.a)}`,`שולם באמצעות ${PAYL[r.pay]||''}`,r.ref,`סה״כ שולם ${docMoney(r.a)}`].filter(Boolean).join('\n')}
-function paperHtml(r){const b=S.ex.biz,dd=r.d.split('-').reverse().join('/'),qty=r.qty||1,unit=r.a/qty;return `<div class="ph"><div><b>${esc(b.name||'')}</b>${b.email?`<div>דוא״ל: ${esc(b.email)}</div>`:''}</div><div><div>מסמך ממוחשב</div><div class="num">קבלה ${r.n} (מקור)${r.void?' · בוטלה':''}</div><div>עוסק פטור: ${esc(b.id||'')}</div><div>תאריך: ${esc(dd)}</div></div></div><div class="pto"><div><b>לכבוד:</b> ${esc(r.who)}</div>${r.whoId?`<div>ת.ז./ע.מ.: ${esc(r.whoId)}</div>`:''}${r.whoAddr?`<div>כתובת: ${esc(r.whoAddr)}</div>`:''}</div><table><thead><tr><th>פירוט</th><th>מחיר יחידה</th><th>כמות</th><th>סה״כ</th></tr></thead><tbody><tr><td>${esc(r.what)}</td><td>${esc(docMoney(unit))}</td><td>${esc(String(qty))}</td><td>${esc(docMoney(r.a))}</td></tr></tbody></table><div class="ppay"><div><b>שולם באמצעות</b><div>${esc(PAYL[r.pay]||'')}</div>${r.ref?`<div>${esc(r.ref)}</div>`:''}</div><div><b>תאריך</b><div>${esc(dd)}</div></div><div><b>סכום</b><div>${esc(docMoney(r.a))}</div></div></div><p class="sum">סה״כ שולם ${esc(docMoney(r.a))}</p><p class="psign">חתימה: <span></span></p><p class="fine">פטור ממע״מ. קבלה על תשלום שהתקבל, לא חשבונית מס.</p>`}
+function paperHtml(r){const b=S.ex.biz,dd=r.d.split('-').reverse().join('/'),qty=r.qty||1,unit=r.a/qty,kind=r.copy?'העתק':'מקור';return `<div class="ph"><div><b>${esc(b.name||'')}</b>${b.email?`<div>דוא״ל: ${esc(b.email)}</div>`:''}</div><div><div>מסמך ממוחשב</div><div class="num">קבלה ${r.n} (${kind})${r.void?' · בוטלה':''}</div><div>עוסק פטור: ${esc(b.id||'')}</div><div>תאריך: ${esc(dd)}</div></div></div><div class="pto"><div><b>לכבוד:</b> ${esc(r.who)}</div>${r.whoId?`<div>ת.ז./ע.מ.: ${esc(r.whoId)}</div>`:''}${r.whoAddr?`<div>כתובת: ${esc(r.whoAddr)}</div>`:''}</div><table><thead><tr><th>פירוט</th><th>מחיר יחידה</th><th>כמות</th><th>סה״כ</th></tr></thead><tbody><tr><td>${esc(r.what)}</td><td>${esc(docMoney(unit))}</td><td>${esc(String(qty))}</td><td>${esc(docMoney(r.a))}</td></tr></tbody></table><div class="ppay"><div><b>שולם באמצעות</b><div>${esc(PAYL[r.pay]||'')}</div>${r.ref?`<div>${esc(r.ref)}</div>`:''}</div><div><b>תאריך</b><div>${esc(dd)}</div></div><div><b>סכום</b><div>${esc(docMoney(r.a))}</div></div></div><p class="sum">סה״כ שולם ${esc(docMoney(r.a))}</p><p class="psign">חתימה: <span></span></p><p class="fine">פטור ממע״מ. קבלה על תשלום שהתקבל, לא חשבונית מס.</p>`}
 function openDoc(id){const r=docBy(id);if(!r)return;$('#paper').innerHTML=paperHtml(r);$('#paper').dataset.id=id;$('#docVoid').hidden=!!r.void;show($('#dDoc'))}
 function renderDocs(){
   if(!docBusy&&$('#docF')&&document.activeElement&&$('#docsBody').contains(document.activeElement))return;
   const b=S.ex.biz,y=T0.getFullYear(),cap=PATUR[y]||0;
   const year=S.ex.docs.filter(d=>!d.void&&d.d.startsWith(String(y)));
   const sum=year.reduce((s,d)=>s+d.a,0);
-  const warn=cap&&sum>cap?`עברת את תקרת העוסק הפטור ל־${y} (${fmt(cap)}).`:cap&&sum>cap*.8?`התקרבנו לתקרת ${y}: ${fmt(cap)}.`:cap?`התקרה ל־${y} היא ${fmt(cap)}.`:'התקרה מתעדכנת כל שנה באתר רשות המסים.';
+  const left=cap?Math.max(0,Math.round((cap-sum)*100)/100):0;
+  const pct=cap?Math.min(100,Math.round(sum/cap*100)):0;
+  const tone=cap&&sum>cap?'over':cap&&sum>cap*.8?'hot':'';
+  const months=MN.map((name,i)=>{const list=year.filter(d=>+d.d.slice(5,7)===i+1);if(!list.length)return '';const s=list.reduce((a,d)=>a+d.a,0);return `<div class="txr"><div class="tm"><b>${name}</b><small>${list.length} קבלות</small></div><b class="ta">${esc(docMoney(s))}</b></div>`}).join('');
+  const clients=[...new Map(S.ex.docs.filter(d=>d.who).map(d=>[d.who,d])).values()];
   const rows=[...S.ex.docs].sort((a,c)=>c.n-a.n);
   $('#docsBody').innerHTML=`<div class="card"><h2>קבלה ללקוח</h2>
 <p class="hint">עוסק פטור מוציא קבלה ברגע שהתשלום התקבל. אין מע״מ, וזו לא חשבונית מס. המספר רץ ולא חוזר על עצמו.</p>
@@ -1852,7 +1857,8 @@ function renderDocs(){
 </div></details>
 <form id="docF" style="margin-top:14px">
 <div class="row2">
-<label>לכבוד<input class="field" id="docWho" maxlength="80" required placeholder="שם הלקוח"></label>
+<label>לכבוד<input class="field" id="docWho" maxlength="80" required placeholder="שם הלקוח" list="docClients"></label>
+<datalist id="docClients">${clients.map(c=>`<option value="${esc(c.who)}">`).join('')}</datalist>
 <label>תאריך<input class="field" id="docD" type="date" required value="${todayStr}"></label>
 </div>
 <div class="row2">
@@ -1872,14 +1878,25 @@ function renderDocs(){
 <p class="err" id="docErr"></p>
 <div class="btnrow"><button class="btn solid" type="submit">הוצא קבלה ${b.next}</button></div>
 </form></div>
-<div class="card"><h2>השנה</h2><p class="gnum" style="margin:0"><b>${esc(docMoney(sum))}</b><span>${year.length} קבלות ב־${y}</span></p><p class="hint">${esc(warn)} לפי הקבלות שהוצאו כאן, לא לפי כל מה שנכנס בבנק. הקבלות הקודמות לא נרשמו שוב כהכנסה.</p></div>
+<div class="card"><h2>מול התקרה</h2>
+<p class="gnum" style="margin:0"><b>${cap&&sum>cap?'עברת':esc(docMoney(left))}</b><span>${cap?`נשארו מתוך ${esc(fmt(cap))} ב־${y}`:`מחזור ${y}`}</span></p>
+<div class="capb ${tone}"><span style="width:${pct}%"></span></div>
+<p class="hint" style="margin:0">נוצל ${esc(docMoney(sum))} ב־${year.length} קבלות. המשכורת לא נספרת. ההצהרה על ${y} עד 31 בינואר ${y+1}.</p>
+${months?`<div class="dayl" style="margin-top:10px">${months}</div>`:''}
+<div class="btnrow"><button type="button" class="btn sm" id="docCsv">הורד את הספר</button></div>
+</div>
 <div class="card"><h2>קבלות</h2>${rows.length?`<div class="dayl">${rows.map(r=>`<div class="txr" data-doc="${esc(r.id)}" style="${r.void?'opacity:.55':''}"><div class="tav">#${r.n}</div><div class="tm"><b>${esc(r.who||'בלי שם')}</b><small>${esc(r.d.split('-').reverse().join('/'))}${r.void?' · בוטלה':''} · ${esc(r.what)}</small></div><b class="ta">${esc(docMoney(r.a))}</b></div>`).join('')}</div>`:'<p class="empty">עוד אין קבלות.</p>'}</div>`;
 }
 function readBiz(){const email=$('#bizEmail')?.value.trim().slice(0,80)||'';return {name:$('#bizName')?.value.trim().slice(0,60)||'',id:($('#bizId')?.value||'').replace(/\D/g,'').slice(0,9),addr:$('#bizAddr')?.value.trim().slice(0,80)||'',phone:($('#bizPhone')?.value||'').replace(/[^\d+\- ]/g,'').slice(0,20),email:/@/.test(email)?email:'',bank:($('#bizBank')?.value||'').replace(/[^\d\-]/g,'').slice(0,20)}}
 function saveBiz(){const v=readBiz(),b=S.ex.biz;if(!v.name)return;if(v.name===b.name&&v.id===b.id&&v.addr===b.addr&&v.phone===b.phone&&v.email===b.email&&v.bank===b.bank)return;change(()=>Object.assign(S.ex.biz,v),{cfg:true,undo:false})}
-$('#docsBody').addEventListener('change',e=>{if(e.target.closest('#bizName,#bizId,#bizAddr,#bizPhone,#bizEmail,#bizBank'))saveBiz()});
-$('#docsBody').addEventListener('click',e=>{const row=e.target.closest('[data-doc]');if(row)openDoc(row.dataset.doc)});
-$('#docsBody').addEventListener('submit',e=>{
+$('#docsBody').addEventListener('change',e=>{
+  if(e.target.closest('#bizName,#bizId,#bizAddr,#bizPhone,#bizEmail,#bizBank'))saveBiz();
+  if(e.target.id==='docWho'){const prev=S.ex.docs.find(d=>d.who===e.target.value.trim());if(prev){if(!$('#docWhoId').value&&prev.whoId)$('#docWhoId').value=prev.whoId;if(!$('#docWhoAddr').value&&prev.whoAddr)$('#docWhoAddr').value=prev.whoAddr}}
+});
+$('#docsBody').addEventListener('click',e=>{
+  if(e.target.id==='docCsv'){const q=v=>{v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};const head=['מספר','תאריך','לקוח','ת.ז.','כתובת','פירוט','כמות','סכום','תשלום','אסמכתא','סטטוס'];const body=[...S.ex.docs].sort((a,b)=>a.n-b.n).map(r=>[r.n,r.d,r.who,r.whoId||'',r.whoAddr||'',r.what,r.qty||1,r.a,PAYL[r.pay]||'',r.ref||'',r.void?'בוטלה':'']);dl(`kablot-${T0.getFullYear()}.csv`,new Blob(['\ufeff'+[head,...body].map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));toast('הספר ירד. שמור אותו מחוץ לטלפון');return}
+  const row=e.target.closest('[data-doc]');if(row)openDoc(row.dataset.doc)});
+$('#docsBody').addEventListener('submit',async e=>{
   if(e.target.id!=='docF')return;e.preventDefault();
   const v=readBiz();
   const who=$('#docWho').value.trim().slice(0,80),whoId=($('#docWhoId').value||'').replace(/\D/g,'').slice(0,9),whoAddr=$('#docWhoAddr').value.trim().slice(0,120),what=$('#docWhat').value.trim().slice(0,240),d=$('#docD').value,a=Math.round((parseFloat($('#docA').value)||0)*100)/100,qty=clamp(Math.round((parseFloat($('#docQty').value)||1)*100)/100,0.01,9999),pay=$('#docPay').value,ref=$('#docRef').value.trim().slice(0,80),inc=$('#docInc').checked,er=$('#docErr');
@@ -1888,7 +1905,10 @@ $('#docsBody').addEventListener('submit',e=>{
   if(!idOk(v.id)){er.textContent='מספר העוסק צריך להיות 9 ספרות תקינות, כולל ספרת ביקורת.';$('#bizId').focus();return}
   if(!who||!what){er.textContent='צריך שם לקוח ועל מה שולם.';return}
   if(!YMD.test(d)){er.textContent='צריך תאריך.';return}
+  if(d>todayStr){er.textContent='מוציאים קבלה ביום שהכסף התקבל, לא מראש.';return}
   if(!(a>0)){er.textContent='צריך סכום גדול מאפס.';return}
+  const y=+d.slice(0,4),cap=PATUR[y]||0,soFar=S.ex.docs.filter(x=>!x.void&&x.d.startsWith(String(y))).reduce((s,x)=>s+x.a,0);
+  if(cap&&soFar+a>cap+0.001&&!(await ask('הקבלה עוברת את התקרה',`אחריה המחזור ב־${y} יהיה ${docMoney(soFar+a)}, מעל ${fmt(cap)}. מעליה פונים למע״מ ועוברים לעוסק מורשה. להוציא בכל זאת?`,'הוצא בכל זאת',true)))return;
   const n=Math.max(S.ex.biz.next,S.ex.docs.reduce((m,x)=>Math.max(m,x.n),0)+1),id=rid(8);let txId='';
   const txIds=[];
   docBusy=true;
@@ -1901,8 +1921,9 @@ $('#docsBody').addEventListener('submit',e=>{
   docBusy=false;
   toast(`קבלה ${n} הוצאה ל${who}`,true);openDoc(id);
 });
-$('#docShare').addEventListener('click',async()=>{const r=docBy($('#paper').dataset.id);if(!r)return;const text=docText(r);if(navigator.share){try{await navigator.share({title:`קבלה ${r.n}`,text});return}catch(e){if(e&&e.name==='AbortError')return}}copyText(text,'הקבלה הועתקה. אפשר להדביק אותה בוואטסאפ','קבלה')});
-$('#docPrint').addEventListener('click',()=>window.print());
+function markCopy(id){const r=docBy(id);if(!r||r.copy)return;docBusy=true;change(()=>{const d=docBy(id);if(d)d.copy=1},{cfg:true,undo:false});docBusy=false}
+$('#docShare').addEventListener('click',async()=>{const r=docBy($('#paper').dataset.id);if(!r)return;const text=docText(r);if(navigator.share){try{await navigator.share({title:`קבלה ${r.n}`,text});markCopy(r.id);return}catch(e){if(e&&e.name==='AbortError')return}}copyText(text,'הקבלה הועתקה. אפשר להדביק אותה בוואטסאפ','קבלה');markCopy(r.id)});
+$('#docPrint').addEventListener('click',()=>{const id=$('#paper').dataset.id;window.print();markCopy(id)});
 $('#docVoid').addEventListener('click',async()=>{
   const r=docBy($('#paper').dataset.id);if(!r||r.void)return;
   if(!(await ask('לבטל את הקבלה?','המספר נשאר תפוס ולא יינתן לקבלה אחרת. אם נרשמה ממנה הכנסה שלא ערכת, היא תימחק.','בטל קבלה',true)))return;
