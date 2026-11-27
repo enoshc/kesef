@@ -278,6 +278,14 @@ const enc=o=>'KSF1.'+btoa(unescape(encodeURIComponent(JSON.stringify(o)))).repla
 function dec(code){const s=String(code||'').replace(/\s+/g,'');const m=s.match(/KSF1\.([A-Za-z0-9_-]+)/);if(!m)return null;try{let b=m[1].replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';const o=JSON.parse(decodeURIComponent(escape(atob(b))));return o&&o.u&&o.k?o:null}catch{return null}}
 const inviteCode=()=>enc({u:SY.url,k:SY.key});
 const validUrl=u=>/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(u);
+function urlProblem(u){
+  if(!/^https:\/\/script\.google\.com\//.test(u))return 'זו לא כתובת של Apps Script. היא צריכה להתחיל ב־https://script.google.com';
+  if(/\/library\//.test(u))return 'זו כתובת של ספרייה (Library), לא של אפליקציית ווב. חזור ל־Deploy ← New deployment, ובגלגל השיניים בחר Web app במקום Library.';
+  if(/\/dev(\?|$)/.test(u))return 'זו כתובת בדיקה שמסתיימת ב־/dev. צריך את ה־Web app URL שמופיע אחרי Deploy, זה שמסתיים ב־/exec.';
+  if(!/\/exec(\?.*)?$/.test(u))return 'הכתובת צריכה להסתיים ב־/exec. העתק את כל ה־Web app URL מחלון הפריסה.';
+  return '';
+}
+const CONNECT_HELP='לא הצלחתי להתחבר לגיליון. בדוק שבחלון הפריסה נבחר Web app, ש־Who has access הוא Anyone (ולא Anyone with Google account), ושאישרת את ההרשאות. אם שינית משהו, צריך לפרוס שוב ולהעתיק את הכתובת החדשה.';
 
 async function connectNew(url){
   url=url.trim();if(!validUrl(url))throw new Error('url');
@@ -499,9 +507,9 @@ ${SY.sv&&SY.sv<3?`<div class="card"><h2>עדכון הסקריפט בגיליון
 <li><div><b>פותחים גיליון חדש</b><p>נכנסים ל־<a href="https://sheets.new" target="_blank" rel="noopener">sheets.new</a> ונותנים לו שם, למשל "הכסף שלי".</p></div></li>
 <li><div><b>פותחים את עורך הסקריפטים</b><p>בתפריט של הגיליון: <kbd>Extensions</kbd> ← <kbd>Apps Script</kbd> (בעברית: תוספים ← Apps Script).</p></div></li>
 <li><div><b>מדביקים את הקוד</b><p>מוחקים את מה שכתוב בעורך, מדביקים את הקוד ושומרים (סמל הדיסקט).</p><div class="btnrow" style="margin:0"><button class="btn solid sm" data-act="copy-gs">העתק את הקוד</button><button class="btn sm" data-act="show-gs">הצג את הקוד</button></div></div></li>
-<li><div><b>פורסים כאפליקציית ווב</b><p><kbd>Deploy</kbd> ← <kbd>New deployment</kbd> ← בגלגל השיניים בוחרים <kbd>Web app</kbd>. ב־<kbd>Execute as</kbd> בוחרים <kbd>Me</kbd>, וב־<kbd>Who has access</kbd> בוחרים <kbd>Anyone</kbd>. לוחצים <kbd>Deploy</kbd>.</p></div></li>
+<li><div><b>פורסים כאפליקציית ווב</b><p><kbd>Deploy</kbd> ← <kbd>New deployment</kbd> ← בגלגל השיניים שליד Select type בוחרים <kbd>Web app</kbd> (לא Library). ב־<kbd>Execute as</kbd> בוחרים <kbd>Me</kbd>, וב־<kbd>Who has access</kbd> בוחרים <kbd>Anyone</kbd>. לוחצים <kbd>Deploy</kbd>.</p></div></li>
 <li><div><b>מאשרים הרשאות</b><p><kbd>Authorize access</kbd> ← בוחרים את החשבון ← <kbd>Advanced</kbd> ← <kbd>Go to … (unsafe)</kbd> ← <kbd>Allow</kbd>. גוגל מזהירה כי זה סקריפט שלא עבר אישור שלהם. זה הסקריפט שלך, בגיליון שלך, והוא ניגש רק לגיליון הזה ולתיקיית הקבלות.</p></div></li>
-<li><div><b>מדביקים כאן את הכתובת</b><p>מעתיקים את <kbd>Web app URL</kbd> (מתחילה ב־script.google.com) ומדביקים:</p>
+<li><div><b>מדביקים כאן את הכתובת</b><p>אחרי Deploy מופיע <kbd>Web app URL</kbd>. מעתיקים אותו, כתובת שמתחילה ב־script.google.com/macros/s/ ומסתיימת ב־<kbd>/exec</kbd>, ומדביקים:</p>
 <input class="field code" id="gsUrl" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(last)}" aria-label="כתובת ה־Web app">
 <p class="err" id="gsErr"></p><button class="btn solid" data-act="connect">חבר את הגיליון</button></div></li>
 </ol>
@@ -685,8 +693,8 @@ const ACT={
   'copy-gs':()=>{if(!GS){toast('הקוד עוד לא נטען, נסה שוב בעוד רגע');return}copyText(GS,'הקוד הועתק. הדבק אותו בעורך של Apps Script','קוד הסקריפט')},
   'show-gs':()=>{if(GS)showText('קוד הסקריפט','מעתיקים את כל הטקסט ומדביקים בעורך של Apps Script.',GS)},
   connect:async(btn)=>{const url=$('#gsUrl').value.trim(),er=$('#gsErr');er.textContent='';try{sessionStorage.setItem('kesef-url',url)}catch{}
-    if(!validUrl(url)){er.textContent='זו לא כתובת של Apps Script. היא צריכה להתחיל ב־https://script.google.com';return}
-    btn.disabled=true;btn.textContent='מתחבר…';try{await connectNew(url);toast('הגיליון חובר. עכשיו אפשר לשלוח קוד הצטרפות לשותף');location.hash='#sync';renderSync()}catch(e){er.textContent=errText(e);btn.disabled=false;btn.textContent='חבר את הגיליון'}},
+    const pr=urlProblem(url);if(pr){er.textContent=pr;return}
+    btn.disabled=true;btn.textContent='מתחבר…';try{await connectNew(url);toast('הגיליון חובר. עכשיו אפשר לשלוח קוד הצטרפות לשותף');location.hash='#sync';renderSync()}catch(e){const m=String(e&&e.message||'');er.textContent=(m==='paired'||m==='busy'||m==='server')?errText(e):CONNECT_HELP;btn.disabled=false;btn.textContent='חבר את הגיליון'}},
   join:async(btn)=>{const er=$('#joinErr');er.textContent='';const code=$('#joinCode').value;if(!dec(code)){er.textContent='הקוד לא נראה תקין. הוא מתחיל ב־KSF1.';return}
     btn.disabled=true;btn.textContent='מצטרף…';try{await connectJoin(code,$('#joinMerge').checked);toast('הצטרפת לחשבון המשותף');renderSync()}catch(e){er.textContent=e.message==='code'?'הקוד לא תקין.':errText(e);btn.disabled=false;btn.textContent='הצטרף'}},
   ss:()=>SS.start(),
