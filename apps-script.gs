@@ -863,7 +863,7 @@ function ingest_(req) {
   var seen = [];
   try { seen = JSON.parse(props.getProperty('ING_SEEN') || '[]'); } catch (e) {}
   seen = seen.filter(function (x) { return now - x.ts < 3 * 86400000; });
-  var dup = seen.filter(function (x) { return x.h === h || (x.a === p.a && x.c === p.card && x.t === p.t && Math.abs(now - x.ts) < 180000); })[0];
+  var dup = seen.filter(function (x) { return x.h === h || (x.a === p.a && x.t === p.t && (x.c === p.card || !x.c || !p.card) && Math.abs(now - x.ts) < 900000); })[0];
   if (dup) { inboxLog_(src, text, 'דולג: ' + SKIP_TXT.dup, p, dup.id); return {ok: true, v: VERSION, skip: 'dup', id: dup.id}; }
 
   var note = [], a = p.a;
