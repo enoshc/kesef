@@ -10,7 +10,7 @@ var FOLDER = 'הכסף שלי - קבלות';
 var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's', 'הערה', 'תגיות', 'x'];
 var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11, note: 12, tags: 13, x: 14};
 var TECH = C.s - C.id + 1;
-var VERSION = 13;
+var VERSION = 14;
 var AUTO_ = function () { return typeof KESEF_AUTO !== 'undefined' && !!KESEF_AUTO; };
 var DEVS = 'מכשירים';
 var DH = ['dev', 'name', 'endpoint', 'pub', 'prefs', 'tokens', 'queue', 'updated'];
@@ -334,16 +334,22 @@ function syncItems_(req, since, now, imgs) {
   return {items: out, ids: ids, newMsgs: newMsgs};
 }
 
+function budOf_(c, sal, cfg) {
+  if (!c || c.int || c.k === 'inc') return 0;
+  if (cfg && cfg.budMode === 'fix') return Math.max(0, Math.round(+c.amt || 0));
+  return sal ? sal * (+c.pct || 0) / 100 : 0;
+}
 function writeCats_(cf, cfg) {
   var cats = (cfg && cfg.cats) || [];
-  cf.getRange(4, 1, Math.max(1, cf.getMaxRows() - 3), 4).clearContent();
-  var rows = [['קטגוריה', 'סוג', '% מהמשכורת', 'נכנסת לחלוקה']];
+  cf.getRange(4, 1, Math.max(1, cf.getMaxRows() - 3), 5).clearContent();
+  var rows = [['קטגוריה', 'סוג', '% מהמשכורת', 'סכום קבוע', 'נכנסת לחלוקה']];
   cats.forEach(function (c) {
-    rows.push([safe_(c.name), c.int ? 'העברה בין חשבונות' : c.sav ? 'חיסכון והשקעות' : c.k === 'inc' ? 'הכנסה' : 'הוצאה', c.k === 'exp' && !c.int ? (+c.pct || 0) : '', c.k === 'inc' && !c.int ? (c.sal ? 'כן' : 'לא') : '']);
+    rows.push([safe_(c.name), c.int ? 'העברה בין חשבונות' : c.sav ? 'חיסכון והשקעות' : c.k === 'inc' ? 'הכנסה' : 'הוצאה', c.k === 'exp' && !c.int ? (+c.pct || 0) : '', c.k === 'exp' && !c.int ? (+c.amt || 0) : '', c.k === 'inc' && !c.int ? (c.sal ? 'כן' : 'לא') : '']);
   });
-  rows.push(['יעד חיסכון חודשי', '', +cfg.goal || 0, '']);
-  cf.getRange(4, 1, rows.length, 4).setValues(rows);
-  cf.getRange(4, 1, 1, 4).setFontWeight('bold');
+  rows.push(['יעד חיסכון חודשי', '', +cfg.goal || 0, '', '']);
+  rows.push(['אופן תקציב', '', cfg.budMode === 'fix' ? 'סכום קבוע' : 'לפי משכורת', '', '']);
+  cf.getRange(4, 1, rows.length, 5).setValues(rows);
+  cf.getRange(4, 1, 1, 5).setFontWeight('bold');
 }
 
 function folder_() {
@@ -471,8 +477,8 @@ function weeklyEmail() {
   var top = Object.keys(byc).filter(function (k) { return byc[k] > 0; }).sort(function (a, b) { return byc[b] - byc[a]; }).slice(0, 5);
   var ap = (+cfg.alertPct || 80) / 100, alerts = [];
   cats.forEach(function (c) {
-    if (c.k !== 'exp' || c.sav || c.int || !sal) return;
-    var b = sal * (+c.pct || 0) / 100; if (!b) return;
+    if (c.k !== 'exp' || c.sav || c.int) return;
+    var b = budOf_(c, sal, cfg); if (!b) return;
     var s = month.reduce(function (acc, t) { var cc = catOf(t); return cc && cc.id === c.id ? acc + signed_(t) : acc; }, 0);
     if (s / b >= ap) alerts.push({name: c.name, s: s, b: b, r: s / b});
   });
@@ -527,7 +533,7 @@ function monthlyEmail() {
   var byc = {};
   month.forEach(function (t) { var v = expA_(t, catOf(t)); if (!v) return; var c = catOf(t), k = c ? c.id || c.name : (t.cn || 'שונות'); byc[k] = (byc[k] || 0) + v; });
   var rows = Object.keys(byc).filter(function (k) { return byc[k] > 0; }).sort(function (a, b) { return byc[b] - byc[a]; }).slice(0, 8).map(function (k) {
-    var c = byId[k], b = c && sal ? sal * (+c.pct || 0) / 100 : 0, s = byc[k];
+    var c = byId[k], b = c ? budOf_(c, sal, cfg) : 0, s = byc[k];
     return {name: c ? c.name : k, s: s, b: b, over: b && s > b};
   });
   var big = month.filter(function (t) { return expA_(t, catOf(t)) > 0; }).sort(function (a, b) { return b.a - a.a; }).slice(0, 5);
@@ -655,8 +661,9 @@ function budgetEvents_(data, cfg, tz) {
   try { lv = JSON.parse(props.getProperty(key) || '{}'); } catch (e) {}
   var ev = [], changed = false;
   cats.forEach(function (c) {
-    if (c.k !== 'exp' || c.sav || c.int || !sal || !(+c.pct)) return;
-    var b = sal * c.pct / 100, s = sp[c.id] || 0, l = s > b + 0.5 ? 2 : (s >= ap * b ? 1 : 0), old = lv[c.id] || 0;
+    if (c.k !== 'exp' || c.sav || c.int) return;
+    var b = budOf_(c, sal, cfg); if (!b) return;
+    var s = sp[c.id] || 0, l = s > b + 0.5 ? 2 : (s >= ap * b ? 1 : 0), old = lv[c.id] || 0;
     if (l > old) ev.push({type: 'budget', title: 'התראת תקציב', body: l === 2 ? c.name + ': חריגה של ' + money_(s - b) + ' מהתקציב' : c.name + ': ניצלתם ' + Math.round(s / b * 100) + '% מהתקציב, נשארו ' + money_(b - s)});
     if (l !== old) { lv[c.id] = l; changed = true; }
   });
@@ -1070,7 +1077,7 @@ function summary_(w) {
   var inc = sumF(incA_), spend = sumF(expA_), sav = sumF(savA_);
   var sal = month.filter(function (t) { var c = catOf(t); return c && c.sal; }).reduce(function (s, t) { return s + incA_(t, catOf(t)); }, 0);
   var rows = cats.filter(function (c) { return c.k === 'exp' && !c.int && !c.sav; }).map(function (c) {
-    var s = month.reduce(function (a, t) { var cc = catOf(t); return cc && cc.id === c.id ? a + signed_(t) : a; }, 0), b = sal * (+c.pct || 0) / 100;
+    var s = month.reduce(function (a, t) { var cc = catOf(t); return cc && cc.id === c.id ? a + signed_(t) : a; }, 0), b = budOf_(c, sal, cfg);
     return {name: c.name, s: Math.round(s), b: Math.round(b), color: c.color || ''};
   }).filter(function (r) { return r.s > 0; }).sort(function (a, b) { return (b.b ? b.s / b.b : 0) - (a.b ? a.s / a.b : 0) || b.s - a.s; }).slice(0, 4);
   var rv = data.filter(function (v) { if (!v[C.id] || !v[C.x]) return false; var x = parseX_(v[C.x]); return x.rv && !/^(כן|v|x|1|true|yes)$/i.test(String(v[C.del]).trim()); }).length;

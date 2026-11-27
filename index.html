@@ -208,9 +208,15 @@
         </div>
       </div>
       <div class="card span2">
-        <h2>עריכת החלוקה</h2>
+        <div class="ch">
+          <h2>כמה לכל דבר</h2>
+          <div class="seg" id="budMode" role="group" aria-label="איך נקבע התקציב">
+            <button type="button" data-v="pct" aria-pressed="true">לפי משכורת</button>
+            <button type="button" data-v="fix" aria-pressed="false">אני קובע</button>
+          </div>
+        </div>
         <p class="hint" id="pctSum"></p>
-        <div class="sheet"><table class="set"><thead><tr><th>צבע</th><th>הוצאה</th><th>סוג</th><th style="text-align:end">% מהמשכורת</th><th style="text-align:end">תקציב</th><th style="text-align:end">בפועל</th><th></th></tr></thead><tbody id="setE"></tbody></table></div>
+        <div class="sheet"><table class="set"><thead><tr><th>צבע</th><th>הוצאה</th><th>סוג</th><th style="text-align:end" id="thAlloc">% מהמשכורת</th><th style="text-align:end" id="thPlan">תקציב</th><th style="text-align:end" id="thLeft">בפועל</th><th></th></tr></thead><tbody id="setE"></tbody></table></div>
         <div class="srow"><span></span><button class="btn sm" id="addE">+ קטגוריית הוצאה</button></div>
       </div>
       <div class="card span2">
@@ -348,7 +354,7 @@
       <p class="slabel">קטגוריות</p>
       <details class="card ssec" id="s-inc"><summary><span><b>קטגוריות הכנסה</b><small>איזו הכנסה נכנסת לחלוקת המשכורת</small></span></summary>
         <div class="ssb">
-        <p class="hint">הכנסה מסומנת נספרת כמשכורת שממנה נגזר התקציב.</p>
+        <p class="hint">הכנסה מסומנת נספרת כמשכורת. במצב «לפי משכורת» ממנה נגזר התקציב. במצב «אני קובע» התקציב הוא הסכום שכתבת לכל קטגוריה.</p>
         <div class="sheet"><table class="set"><thead><tr><th>צבע</th><th>הכנסה</th><th>סוג</th><th>נכנסת לחלוקה</th><th></th></tr></thead><tbody id="setI"></tbody></table></div>
         <div class="srow"><span></span><button class="btn sm" id="addI">+ קטגוריית הכנסה</button></div>
       </div>
@@ -485,7 +491,7 @@
     </div>
     <label>תיאור<input class="field" id="salN" maxlength="120"></label>
     <div>
-      <div class="lbl">כך היא מתחלקת. האחוזים יישמרו כחלוקה הקבועה.</div>
+      <div class="lbl" id="salSplitLbl">כך היא מתחלקת. האחוזים יישמרו כחלוקה הקבועה.</div>
       <div id="split"></div>
       <p class="sumline" id="splitSum"></p>
     </div>
@@ -538,6 +544,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=28"></script>
+<script src="app.js?v=29"></script>
 </body>
 </html>

@@ -34,7 +34,7 @@ const DEF=()=>[
   {id:'i2',k:'inc',name:'עבודות צד',color:'#12a5b8'},
   {id:'i3',k:'inc',name:'הכנסה אחרת',color:'#6b7f2a'},
   {id:'t1',k:'exp',name:'העברות בין חשבונות',color:'#94a3b8',int:true}];
-const blank=()=>({cats:DEF().map(normCat),tx:[],items:[],rec:[],rules:{},weekly:{emails:[],on:false,freq:'month',mday:11},goal:2000,alertPct:80,su:0,profile:{name:''},ex:normEx()});
+const blank=()=>({cats:DEF().map(normCat),tx:[],items:[],rec:[],rules:{},weekly:{emails:[],on:false,freq:'month',mday:11},goal:2000,alertPct:80,budMode:'pct',su:0,profile:{name:''},ex:normEx()});
 function sampleData(){
   let s=20261127;const r=()=>(s=s*16807%2147483647)/2147483647;const tx=[];
   for(let k=5;k>=0;k--){
@@ -55,7 +55,7 @@ function sampleData(){
   }
   return {...blank(),tx};
 }
-function normCat(c){if(!c||typeof c!=='object')return null;const int=!!c.int,k=c.k==='inc'?'inc':'exp';return {id:String(c.id||rid()),k,name:String(c.name||'ללא שם').slice(0,40),color:HEX.test(c.color||'')?c.color:'#64748b',pct:int?0:clamp(Math.round(+c.pct||0),0,100),sal:!int&&k==='inc'&&!!c.sal,sav:!int&&k==='exp'&&!!c.sav,int}}
+function normCat(c){if(!c||typeof c!=='object')return null;const int=!!c.int,k=c.k==='inc'?'inc':'exp';return {id:String(c.id||rid()),k,name:String(c.name||'ללא שם').slice(0,40),color:HEX.test(c.color||'')?c.color:'#64748b',pct:int?0:clamp(Math.round(+c.pct||0),0,100),amt:int?0:Math.max(0,Math.min(1e7,Math.round(+c.amt||0))),sal:!int&&k==='inc'&&!!c.sal,sav:!int&&k==='exp'&&!!c.sav,int}}
 function normX(x){if(!x||typeof x!=='object')return null;const o={};
   if(x.rv)o.rv=1;if(['card','bank','cash'].includes(x.ac))o.ac=x.ac;if(YMD.test(x.bd||''))o.bd=x.bd;
   if(Array.isArray(x.sp)){const sp=x.sp.map(p=>{const q={n:String(p?.n||'').trim().slice(0,30),a:Math.round(Math.abs(+p?.a||0)*100)/100};if(p?.ok)q.ok=1;if(p?.lk)q.lk=String(p.lk).slice(0,40);return q}).filter(p=>p.n&&p.a>0).slice(0,12);if(sp.length)o.sp=sp}
@@ -81,6 +81,7 @@ function norm(d){
   o.rules=normRules(d.rules);o.weekly=normWeekly(d.weekly);
   o.goal=d.goal===undefined?2000:Math.max(0,+d.goal||0);
   o.alertPct=clamp(+d.alertPct||80,50,100);
+  o.budMode=d.budMode==='fix'?'fix':'pct';
   o.su=+d.su||0;o.profile={name:String(d.profile?.name||'').slice(0,40)};o.ex=normEx(d.ex);
   return o;
 }
@@ -136,7 +137,8 @@ function typeLabel(t){const k=kd(t),i=t.t==='inc';return k==='int'?(i?'העבר�
 function ensureInt(){let c=ints()[0];if(!c){c=normCat({id:S.cats.some(x=>x.id==='t1')?rid(8):'t1',k:'exp',name:'העברות בין חשבונות',color:'#94a3b8',int:true});S.cats.push(c);S.su=Date.now();if(SY.on)SY.cfgDirty=true}return c}
 const G=()=>Math.max(0,+S.goal||0);
 const AP=()=>clamp(+S.alertPct||80,50,100);
-const budgetOf=(ym,c)=>salary(ym)*(+c.pct||0)/100;
+const budFix=()=>S.budMode==='fix';
+const budgetOf=(ym,c)=>budFix()?Math.max(0,+c.amt||0):salary(ym)*(+c.pct||0)/100;
 const savedIn=ym=>sumBy(inM(ym),savA);
 const defDate=()=>ui.cur===nowYm?todayStr:ui.cur+'-01';
 function lvl(ym,id){const c=cat(id);if(!c||c.k!=='exp'||c.sav||c.int)return 0;const b=budgetOf(ym,c);if(!b)return 0;const r=spent(ym,id)/b;return r>1.0001?2:r>=AP()/100?1:0}
@@ -226,7 +228,7 @@ const Sync={busy:false,again:false,timer:null,upBusy:false,
       const iids=[...new Set(SY.idirty)],sentI={};
       const items=iids.map(id=>{const t=S.items.find(x=>x.id===id);if(!t)return null;sentI[id]=t.u;return {...t,del:t.del?1:0}}).filter(Boolean);
       const cfgSent=SY.cfgDirty,su=S.su;
-      const res=await this.call({action:'sync',dev:ui.dev,me:ui.me,since:full?0:SY.since,full,tx,items,cfg:cfgSent&&!SY.ro?{cats:S.cats,goal:G(),alertPct:AP(),name:S.profile.name,rec:S.rec,rules:S.rules,weekly:S.weekly,ex:S.ex,u:S.su}:null});
+      const res=await this.call({action:'sync',dev:ui.dev,me:ui.me,since:full?0:SY.since,full,tx,items,cfg:cfgSent&&!SY.ro?{cats:S.cats,goal:G(),alertPct:AP(),budMode:budFix()?'fix':'pct',name:S.profile.name,rec:S.rec,rules:S.rules,weekly:S.weekly,ex:S.ex,u:S.su}:null});
       if(!res||!res.ok)throw new Error(res&&res.err||'server');
       SY.dirty=SY.dirty.filter(id=>{const t=S.tx.find(x=>x.id===id);return t&&t.u!==sentU[id]});
       if(cfgSent&&S.su===su)SY.cfgDirty=false;
@@ -277,6 +279,7 @@ function applyRemote(res,full){
     if(cs.some(c=>c.k==='exp'&&!c.int)&&cs.some(c=>c.k==='inc'&&!c.int))S.cats=cs;
     if(res.cfg.goal!==undefined)S.goal=Math.max(0,+res.cfg.goal||0);
     if(res.cfg.alertPct)S.alertPct=clamp(+res.cfg.alertPct,50,100);
+    if(res.cfg.budMode==='fix'||res.cfg.budMode==='pct')S.budMode=res.cfg.budMode;
     if(typeof res.cfg.name==='string')S.profile.name=res.cfg.name.slice(0,40);
     if(Array.isArray(res.cfg.rec))S.rec=res.cfg.rec.map(normRec).filter(Boolean);
     if(res.cfg.rules)S.rules=normRules(res.cfg.rules);
@@ -423,7 +426,7 @@ function renderAlerts(){
   });
   const g=G(),sv=savedIn(cur);
   if(g&&sv<g&&cur===nowYm)out.push(['warn',`חסרים ${fmt(g-sv)} ליעד החיסכון`,`הפרשת ${fmt(sv)} מתוך ${fmt(g)} החודש.`]);
-  if(!salary(cur)&&inM(cur).length)out.push(['warn','עוד לא נרשמה משכורת החודש','בלי משכורת אין תקציב לקטגוריות, אז אין גם התראות חריגה.']);
+  if(!salary(cur)&&inM(cur).length&&!budFix())out.push(['warn','עוד לא נרשמה משכורת החודש','בלי משכורת אין תקציב לקטגוריות, אז אין גם התראות חריגה.']);
   if(cur===nowYm){const cf=cardForecast();if(cf&&cf.low)out.unshift(['over',`צפוי חוסר בבנק ב־${ddm(cf.d)}`,`חיוב הכרטיס (${fmt(cf.a)}) ישאיר בערך ${fmt(cf.after)}. כדאי להעביר כסף לפני.`]);
     subs().filter(s=>s.isNew||s.chg>0).slice(0,3).forEach(s=>out.push(['warn',s.isNew?`מנוי חדש: ${s.n.slice(0,30)}`:`${s.n.slice(0,30)} התייקר`,s.isNew?`${fmt(s.a)} ${s.yearly?'בשנה':'בחודש'}. אם זה לא שלך, כדאי לבדוק.`:`מ־${fmt(s.prev)} ל־${fmt(s.a)}.`]));
     const ow=sumBy(owed(),o=>o.a);if(ow>0)out.push(['warn',`מגיעים לך ${fmt(ow)} מחברים`,'פירוט ב"דוחות", בכרטיס "מי חייב לי".'])}
@@ -452,11 +455,15 @@ function donutD(a0,a1){
   return {d:`M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${ro} ${ro} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} L ${x2.toFixed(2)} ${y2.toFixed(2)} A ${ri} ${ri} 0 ${large} 0 ${x3.toFixed(2)} ${y3.toFixed(2)} Z`,even:false};
 }
 function pieParts(mode,limit){
-  const sal=salary(ui.cur);
-  let rows=exps().map(c=>{const pct=+c.pct||0,plan=sal*pct/100,got=Math.max(0,spent(ui.cur,c.id)),v=mode==='plan'?(sal?plan:pct):got;
+  const fix=budFix(),sal=salary(ui.cur);
+  let rows=exps().map(c=>{const pct=+c.pct||0,plan=budgetOf(ui.cur,c),got=Math.max(0,spent(ui.cur,c.id)),v=mode==='plan'?(fix||sal?plan:pct):got;
     return {id:c.id,name:c.name,color:col(c),plan,got,pct,v,free:false,more:false}}).filter(r=>r.v>0.5);
-  if(mode==='plan'){const free=Math.max(0,100-exps().reduce((s,c)=>s+(+c.pct||0),0));
-    if(free>0.5)rows.push({id:'free',name:'נשאר חופשי',color:'#c4b6a4',plan:sal*free/100,got:0,pct:free,v:sal?sal*free/100:free,free:true,more:false})}
+  if(mode==='plan'){
+    if(fix){const used=exps().reduce((s,c)=>s+budgetOf(ui.cur,c),0),freeN=sal>used+.5?sal-used:0;
+      if(freeN>0.5)rows.push({id:'free',name:'נשאר חופשי',color:'#c4b6a4',plan:freeN,got:0,pct:0,v:freeN,free:true,more:false})}
+    else{const free=Math.max(0,100-exps().reduce((s,c)=>s+(+c.pct||0),0));
+      if(free>0.5)rows.push({id:'free',name:'נשאר חופשי',color:'#c4b6a4',plan:sal*free/100,got:0,pct:free,v:sal?sal*free/100:free,free:true,more:false})}
+  }
   rows.sort((a,b)=>(a.free?1:0)-(b.free?1:0)||b.v-a.v);
   if(limit&&rows.filter(r=>!r.free).length>limit){const real=rows.filter(r=>!r.free),head=real.slice(0,limit-1),rest=real.slice(limit-1);
     head.push({id:'more',name:`עוד ${rest.length}`,color:'#8d8274',plan:rest.reduce((s,r)=>s+r.plan,0),got:rest.reduce((s,r)=>s+r.got,0),pct:0,v:rest.reduce((s,r)=>s+r.v,0),free:false,more:true});rows=head}
@@ -465,19 +472,21 @@ function pieParts(mode,limit){
 function paintPie(kind){
   const home=kind==='home',svg=$(home?'#homePie':'#budPie'),cen=$(home?'#homePieCen':'#budPieCen'),list=$(home?'#homePieList':'#budPieList');
   if(!svg||!cen||!list)return;
-  const mode=home?'spent':pieMode,{rows,sum,sal}=pieParts(mode,home?6:0);
+  const fix=budFix(),mode=home?'spent':pieMode,{rows,sum,sal}=pieParts(mode,home?6:0);
   if(home){$('#catHint').textContent=rows.length?'לוחצים על פלח או על שם, ורואים כמה יצא מול התקציב.':'עוד אין הוצאות בחודש הזה.'}
-  else{$('#pieHint').textContent=!rows.length?'קבעו אחוז לכל קטגוריה למטה, והעוגה תתחלק לפי המשכורת.':mode==='plan'?(sal?'כל פלח הוא חלק מהמשכורת. לחיצה מראה כמה נשאר.':'אין משכורת החודש, אז הגודל הוא לפי האחוז שקבעת.'):'כל פלח הוא מה שיצא בפועל. חריגה כתובה ליד השם, לא רק בצבע.'}
+  else{$('#pieHint').textContent=!rows.length?(fix?'כתוב כמה אתה מקדיש לכל קטגוריה, והעוגה תתחלק לפי זה.':'קבעו אחוז לכל קטגוריה למטה, והעוגה תתחלק לפי המשכורת.'):mode==='plan'?(fix?'כל פלח הוא הסכום שקבעת לחודש. לחיצה מראה כמה נשאר.':sal?'כל פלח הוא חלק מהמשכורת. לחיצה מראה כמה נשאר.':'אין משכורת החודש, אז הגודל הוא לפי האחוז שקבעת.'):'כל פלח הוא מה שיצא בפועל. חריגה כתובה ליד השם, לא רק בצבע.'}
   if(!rows.length){svg.innerHTML='';cen.innerHTML='<b>—</b><span>אין נתונים</span>';list.innerHTML=`<li class="empty">${home?'אין הוצאות בחודש הזה.':'אין עדיין חלוקה.'}</li>`;return}
   let ang=-Math.PI/2;const gap=rows.length>1?.04:0;
   const parts=rows.map(r=>{const sw=r.v/sum*Math.PI*2,a0=ang+(rows.length>1?gap/2:0),a1=ang+sw-(rows.length>1?gap/2:0);ang+=sw;return {...r,a0,a1:Math.max(a0+.01,a1)}});
   svg.innerHTML=parts.map(p=>{const mid=(p.a0+p.a1)/2,pull=p.id===pieSel?8:0,dx=(Math.cos(mid)*pull).toFixed(2),dy=(Math.sin(mid)*pull).toFixed(2),sh=donutD(p.a0,p.a1);
     return `<path d="${sh.d}" fill="${p.color}" ${sh.even?'fill-rule="evenodd"':''} data-pie="${esc(p.id)}" data-home="${home?1:0}" class="${p.id===pieSel?'on':''}" style="transform:translate(${dx}px,${dy}px)"><title>${esc(p.name)} ${esc(fmt(p.v))}</title></path>`}).join('');
-  if(show)cen.innerHTML=`<b>${esc(fmt(mode==='plan'&&show.plan?show.plan:show.v))}</b><span>${esc(show.name)}</span>`;
-  else cen.innerHTML=`<b>${esc(mode==='plan'&&!sal?Math.round(rows.filter(r=>!r.free).reduce((s,r)=>s+r.pct,0))+'%':fmt(sum))}</b><span>${home||mode==='spent'?'יצא החודש':sal?'המשכורת':'החלוקה'}</span>`;
-  list.innerHTML=parts.map(p=>{const over=p.plan>1&&p.got>p.plan+.5;
-    const sub=p.more?'לכל הקטגוריות בתקציב':p.free?`${Math.round(p.pct)}% לא משויך`:mode==='plan'?`${Math.round(p.pct)}%${p.plan?` · תקציב ${fmt(p.plan)}`:''}${over?` · חריגה ${fmt(p.got-p.plan)}`:(p.plan>1?` · נשארו ${fmt(Math.max(0,p.plan-p.got))}`:'')}`:(p.plan>1?(over?`חריגה ${fmt(p.got-p.plan)} מתוך ${fmt(p.plan)}`:`נשארו ${fmt(Math.max(0,p.plan-p.got))} מתוך ${fmt(p.plan)}`):'בלי תקציב לחודש');
-    return `<li><button type="button" data-pie="${esc(p.id)}" data-home="${home?1:0}" class="${p.id===pieSel?'on':''}${over?' over':''}" aria-pressed="${p.id===pieSel}"><i style="background:${p.color}" aria-hidden="true"></i><span>${esc(p.name)}<small>${esc(sub)}</small></span><b>${esc(p.free&&!sal?Math.round(p.pct)+'%':fmt(p.v))}</b></button></li>`}).join('');
+  const picked=parts.find(p=>p.id===pieSel);
+  if(picked)cen.innerHTML=`<b>${esc(fmt(mode==='plan'&&picked.plan?picked.plan:picked.v))}</b><span>${esc(picked.name)}</span>`;
+  else{const planPct=!fix&&mode==='plan'&&!sal,label=home||mode==='spent'?'יצא החודש':fix?(sal&&parts.some(p=>p.free)?'המשכורת':'התקציב'):sal?'המשכורת':'החלוקה';
+    cen.innerHTML=`<b>${esc(planPct?Math.round(rows.filter(r=>!r.free).reduce((s,r)=>s+r.pct,0))+'%':fmt(sum))}</b><span>${label}</span>`}
+  list.innerHTML=parts.map(p=>{const over=p.plan>1&&p.got>p.plan+.5,left=fmt(Math.max(0,p.plan-p.got)),gap=fmt(p.got-p.plan);
+    const sub=p.more?'לכל הקטגוריות בתקציב':p.free?(fix?'מהמשכורת, בלי ייעוד':`${Math.round(p.pct)}% לא משויך`):mode==='plan'?(fix?(over?`חריגה ${gap}`:(p.plan>1?`נשארו ${left}`:'')):`${Math.round(p.pct)}%${p.plan?` · תקציב ${fmt(p.plan)}`:''}${over?` · חריגה ${gap}`:(p.plan>1?` · נשארו ${left}`:'')}`):(p.plan>1?(over?`חריגה ${gap} מתוך ${fmt(p.plan)}`:`נשארו ${left} מתוך ${fmt(p.plan)}`):'בלי תקציב לחודש');
+    return `<li><button type="button" data-pie="${esc(p.id)}" data-home="${home?1:0}" class="${p.id===pieSel?'on':''}${over?' over':''}" aria-pressed="${p.id===pieSel}"><i style="background:${p.color}" aria-hidden="true"></i><span>${esc(p.name)}<small>${esc(sub)}</small></span><b>${esc(p.free&&!sal&&!fix?Math.round(p.pct)+'%':fmt(p.v))}</b></button></li>`}).join('');
 }
 function pickPie(id){
   if(id==='more'){pieMode='spent';pieSel='';location.hash='#budget';return}
@@ -557,16 +566,24 @@ function renderTx(){
 function renderBudget(){
   renderRecList();
   const gi=$('#goalIn'),ai=$('#apIn');if(document.activeElement!==gi)gi.value=G();if(document.activeElement!==ai)ai.value=AP();
-  const sal=salary(ui.cur);let sum=0;
-  $('#setE').innerHTML=exps().map(c=>{sum+=+c.pct||0;return `<tr data-cid="${esc(c.id)}">
+  const fix=budFix(),sal=salary(ui.cur);let sum=0,sumA=0;
+  setSeg($('#budMode'),fix?'fix':'pct');
+  $('#thAlloc').textContent=fix?'כמה בחודש':'% מהמשכורת';
+  $('#thPlan').textContent=fix?'בפועל':'תקציב';
+  $('#thLeft').textContent=fix?'נשאר':'בפועל';
+  $('#setE').innerHTML=exps().map(c=>{
+    const b=budgetOf(ui.cur,c),s=spent(ui.cur,c.id);sum+=+c.pct||0;sumA+=b;
+    const mid=fix?`<td data-a="p" data-l="בחודש" class="amt"><input type="number" min="0" step="50" inputmode="numeric" data-k="amt" value="${+c.amt||0}" aria-label="כמה בחודש ל${esc(c.name)}"></td><td data-a="b" data-l="בפועל" class="num">${fmt(s)}</td><td data-a="a" data-l="נשאר" class="num${s>b+.5?' bad':''}">${fmt(b-s)}</td>`
+      :`<td data-a="p" data-l="אחוז" class="amt"><input type="number" min="0" max="100" step="1" inputmode="numeric" data-k="pct" value="${+c.pct||0}" aria-label="אחוז מהמשכורת ל${esc(c.name)}"></td><td data-a="b" data-l="תקציב" class="num">${fmt(b)}</td><td data-a="a" data-l="בפועל" class="num">${fmt(s)}</td>`;
+    return `<tr data-cid="${esc(c.id)}">
 <td data-a="k"><input type="color" data-k="color" value="${col(c)}" aria-label="צבע"></td>
 <td data-a="n"><input data-k="name" value="${esc(c.name)}" maxlength="40" aria-label="שם קטגוריה"></td>
 <td data-a="t" data-l="סוג">${kindSel(c)}</td>
-<td data-a="p" data-l="אחוז" class="amt"><input type="number" min="0" max="100" step="1" inputmode="numeric" data-k="pct" value="${+c.pct||0}" aria-label="אחוז מהמשכורת"></td>
-<td data-a="b" data-l="תקציב" class="num">${fmt(sal*(+c.pct||0)/100)}</td>
-<td data-a="a" data-l="בפועל" class="num">${fmt(spent(ui.cur,c.id))}</td>
+${mid}
 <td data-a="x" class="x"><button data-cdel aria-label="מחק קטגוריה"><svg class="ic"><use href="#i-x"/></svg></button></td></tr>`}).join('');
-  const ps=$('#pctSum');ps.textContent=`מוקצה ${sum}% מהמשכורת`+(sum<100?`, ${100-sum}% נשארים חופשיים.`:sum>100?', יותר מ־100%. כדאי להוריד באחת הקטגוריות.':'. כל השקל מתוכנן.');ps.className='hint'+(sum>100?' bad':'');
+  const ps=$('#pctSum');
+  if(fix){ps.textContent=`הקדשת ${fmt(sumA)} בחודש.${sal?` המשכורת ${fmt(sal)}${sumA<sal-.5?`, ו־${fmt(sal-sumA)} בלי ייעוד`:sumA>sal+.5?`, ${fmt(sumA-sal)} מעבר למשכורת`:''}.`:' הסכום קבוע גם בחודש בלי משכורת.'}`;ps.className='hint'}
+  else{ps.textContent=`מוקצה ${sum}% מהמשכורת`+(sum<100?`, ${100-sum}% נשארים חופשיים.`:sum>100?', יותר מ־100%. כדאי להוריד באחת הקטגוריות.':'. כל השקל מתוכנן.');ps.className='hint'+(sum>100?' bad':'')}
   setSeg($('#pieMode'),pieMode);paintPie('bud');
   $('#setI').innerHTML=incs().map(c=>`<tr data-cid="${esc(c.id)}">
 <td data-a="k"><input type="color" data-k="color" value="${col(c)}" aria-label="צבע"></td>
@@ -585,7 +602,7 @@ function renderBudget(){
   renderRules();
 }
 const kindSel=c=>`<select class="field ksel" data-k="kind" aria-label="סוג הקטגוריה ${esc(c.name)}">${['exp','sav','inc','int'].map(k=>`<option value="${k}"${catKind(c)===k?' selected':''}>${KINDL[k]}</option>`).join('')}</select>`;
-function setKind(c,v){c.int=v==='int';c.sav=v==='sav';if(v==='exp'||v==='sav')c.k='exp';else if(v==='inc')c.k='inc';if(c.int){c.pct=0;c.sal=false;c.sav=false}if(c.k==='inc')c.sav=false;if(c.k==='exp')c.sal=false}
+function setKind(c,v){c.int=v==='int';c.sav=v==='sav';if(v==='exp'||v==='sav')c.k='exp';else if(v==='inc')c.k='inc';if(c.int){c.pct=0;c.amt=0;c.sal=false;c.sav=false}if(c.k==='inc')c.sav=false;if(c.k==='exp')c.sal=false}
 
 /* ---------- render: sync ---------- */
 let GS='';
@@ -963,6 +980,7 @@ function openSal(){
   $('#salC').innerHTML=sc.map(c=>`<option value="${esc(c.id)}"${c===first?' selected':''}>${esc(c.name)}</option>`).join('');
   $('#salA').value='';$('#salN').value='משכורת חודשית';$('#salD').value=defDate();$('#salErr').textContent='';
   draft=exps().map(c=>({id:c.id,p:+c.pct||0}));
+  $('#salSplitLbl').textContent=budFix()?'האחוזים נשמרים לכשתחזור למצב לפי משכורת. התקציב עצמו נשאר הסכומים שקבעת.':'כך היא מתחלקת. האחוזים יישמרו כחלוקה הקבועה.';
   $('#split').innerHTML=exps().map(c=>`<div class="sp"><span class="cn"><i style="background:${col(c)}"></i>${esc(c.name)}</span><input class="field" type="number" min="0" max="100" step="1" inputmode="numeric" data-sid="${esc(c.id)}" value="${+c.pct||0}" aria-label="אחוז ל${esc(c.name)}"><b data-sv="${esc(c.id)}"></b></div>`).join('');
   updSplit();show($('#dSal'));setTimeout(()=>$('#salA').focus(),80);
 }
@@ -1080,7 +1098,7 @@ function setChange(e){const el=e.target,tr=el.closest('tr[data-cid]');if(!tr)ret
     if(!after.some(x=>x.k==='exp'&&!x.int)||!after.some(x=>x.k==='inc'&&!x.int)){toast('צריך להשאיר לפחות קטגוריית הוצאה אחת וקטגוריית הכנסה אחת');renderBudget();return}
     const n=TX().filter(t=>t.c===c.id).length;change(()=>setKind(c,v),{cfg:true});
     toast(`${c.name}: ${KINDL[v]}.${n?` ${n} התנועות שבה נספרות מעכשיו בהתאם.`:''}${v==='int'?' לא נספרת בהכנסות ובהוצאות.':''}`,true);return}
-  change(()=>{if(k==='color'){if(HEX.test(el.value))c.color=el.value}else if(k==='name')c.name=el.value.trim().slice(0,40);else if(k==='pct')c.pct=clamp(Math.round(+el.value||0),0,100);else if(k==='sal')c.sal=el.checked},{cfg:true})}
+  change(()=>{if(k==='color'){if(HEX.test(el.value))c.color=el.value}else if(k==='name')c.name=el.value.trim().slice(0,40);else if(k==='pct')c.pct=clamp(Math.round(+el.value||0),0,100);else if(k==='amt')c.amt=Math.max(0,Math.min(1e7,Math.round(+el.value||0)));else if(k==='sal')c.sal=el.checked},{cfg:true})}
 function setClick(e){if(!e.target.closest('[data-cdel]'))return;const c=cat(e.target.closest('tr').dataset.cid);if(!c)return;
   const moved=TX().filter(t=>t.c===c.id).map(t=>t.id);
   const same=S.cats.filter(x=>x.id!==c.id&&(c.int?x.int:(x.k===c.k&&!x.int)));
@@ -1090,8 +1108,11 @@ function setClick(e){if(!e.target.closest('[data-cdel]'))return;const c=cat(e.ta
   change(()=>{moved.forEach(id=>{S.tx.find(t=>t.id===id).c=fb.id});S.cats=S.cats.filter(x=>x.id!==c.id);if(ui.catF===c.id)ui.catF=''},{tx:moved,cfg:true});
   toast(moved.length?`הקטגוריה נמחקה, ${moved.length} תנועות עברו ל${fb.name}`:'הקטגוריה נמחקה',true)}
 ['#setE','#setI','#setT'].forEach(s=>{$(s).addEventListener('change',setChange);$(s).addEventListener('click',setClick)});
-function addCat(k){const id=rid(8);change(()=>S.cats.push({id,k:k==='inc'?'inc':'exp',name:k==='exp'?'קטגוריה חדשה':k==='inc'?'הכנסה חדשה':'חשבון נוסף',color:k==='int'?'#94a3b8':PAL[S.cats.length%PAL.length],pct:0,sal:false,sav:false,int:k==='int'}),{cfg:true});$(`tr[data-cid="${id}"] input[data-k=name]`)?.select()}
+function addCat(k){const id=rid(8);change(()=>S.cats.push({id,k:k==='inc'?'inc':'exp',name:k==='exp'?'קטגוריה חדשה':k==='inc'?'הכנסה חדשה':'חשבון נוסף',color:k==='int'?'#94a3b8':PAL[S.cats.length%PAL.length],pct:0,amt:0,sal:false,sav:false,int:k==='int'}),{cfg:true});$(`tr[data-cid="${id}"] input[data-k=name]`)?.select()}
 $('#addE').addEventListener('click',()=>addCat('exp'));$('#addI').addEventListener('click',()=>addCat('inc'));$('#addT').addEventListener('click',()=>addCat('int'));
+$('#budMode').addEventListener('click',e=>{const v=e.target.closest('button')?.dataset.v;if(!v||(v==='fix')===budFix())return;const seed=v==='fix'&&!exps().some(c=>+c.amt>0),sal=salary(ui.cur)||salary(shiftYm(ui.cur,-1));
+  change(()=>{S.budMode=v==='fix'?'fix':'pct';if(seed){const list=exps(),pctSum=list.reduce((s,c)=>s+(+c.pct||0),0);let used=0;list.forEach((c,i)=>{if(i===list.length-1&&Math.round(pctSum)===100)c.amt=Math.max(0,Math.round(sal)-used);else{c.amt=Math.max(0,Math.round(sal*(+c.pct||0)/100));used+=c.amt}})}},{cfg:true});
+  toast(v==='fix'?(seed&&sal?'הסכומים התחילו מהחלוקה של המשכורת. אפשר לשנות כל שורה.':'עכשיו אתה קובע כמה שקלים לכל קטגוריה.'):'התקציב חזר להיות אחוז מהמשכורת.',true)});
 
 /* import events */
 $('#impFile').addEventListener('change',e=>{if(e.target.files.length)readFiles(e.target.files)});
@@ -1131,7 +1152,7 @@ $('#xlsxDown').addEventListener('click',async e=>{const b=e.currentTarget;b.disa
     for(let r=1;r<t1.length;r++){const c=ws1[XLSX.utils.encode_cell({r,c:0})];if(c)c.z='dd/mm/yyyy';const a=ws1[XLSX.utils.encode_cell({r,c:4})];if(a)a.z='#,##0.00'}
     const months=[...new Set(txs.map(t=>t.d.slice(0,7)))];
     const t2=[['חודש','הכנסות','הוצאות','לחיסכון','נשאר']].concat(months.map(m=>[MN[mIdx(m)]+' '+m.slice(0,4),tot(m,'inc'),spendM(m),savedIn(m),tot(m,'inc')-tot(m,'exp')]));
-    const t3=[['קטגוריה','סוג','% מהמשכורת']].concat(S.cats.map(c=>[c.name,KINDL[catKind(c)],c.k==='exp'&&!c.int?c.pct:'']));
+    const t3=[['קטגוריה','סוג','% מהמשכורת','סכום קבוע']].concat(S.cats.map(c=>[c.name,KINDL[catKind(c)],c.k==='exp'&&!c.int?c.pct:'',c.k==='exp'&&!c.int?(+c.amt||0):'']));
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws1,'תנועות');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(t2),'סיכום חודשי');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(t3),'קטגוריות');
     wb.Workbook={Views:[{RTL:true}]};
     const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
@@ -1518,7 +1539,7 @@ document.addEventListener('change',async e=>{const k=e.target.dataset&&e.target.
   if(ui.push.on&&SY.on){try{const r=await Sync.call({action:'push-prefs',dev:ui.dev,prefs:ui.push.prefs});toast(r.ok?'ההעדפות נשמרו':'לא הצלחתי לשמור, נסה שוב')}catch(err){toast(errText(err))}}});
 
 /* ---------- sync screen: script updates, Siri, widget, partner ---------- */
-const GSV=13;let LD='';
+const GSV=14;let LD='';
 async function loadLD(){for(const u of ['https://raw.githubusercontent.com/enoshc/kesef/main/loader.gs?t=','loader.gs?t=']){try{const r=await fetch(u+Date.now(),{cache:'no-store'});if(r.ok){const t=await r.text();if(/KESEF_AUTO/.test(t)){LD=t;return t}}}catch{}}return LD}
 const STEPS=(btn)=>`<ol class="steps"><li><div><b>פותחים את עורך הסקריפטים</b><p>בגיליון: <kbd>Extensions</kbd> ← <kbd>Apps Script</kbd>.</p></div></li>
 <li><div><b>מחליפים את הקוד</b><p>מוחקים את כל הקוד הישן, מדביקים את החדש ושומרים.</p>${btn}</div></li>
@@ -1528,7 +1549,7 @@ function updCard(){
   if(SY.ro)return '';
   if(SY.auto)return `<div class="card"><h2>עדכונים אוטומטיים לסקריפט</h2><p class="hint">הסקריפט בגיליון מושך לבד את הגרסה העדכנית מ־GitHub, פעם בשעה (עכשיו גרסה ${SY.sv||''}). אין צורך להעתיק קוד בכל עדכון.</p><div class="btnrow"><button class="btn sm" data-act="gs-reload">משוך עכשיו את הגרסה האחרונה</button></div></div>`;
   if(!(SY.sv&&SY.sv<GSV))return '';
-  const what=[SY.sv<3?'תמונות והודעות':'',SY.sv<5?'הערות ותגיות':'',SY.sv<7?'סיכום במייל':'',SY.sv<8?'התראות בטלפון':'',SY.sv<9?'קליטה אוטומטית של חיובים מההודעות':'','זיכויים שמקטינים את ההוצאה, העברות בין החשבונות שלך, תיבת "לבדיקה", הוספה בקול עם סירי, וידג׳ט למסך הבית, שותף לצפייה בלבד ועדכונים אוטומטיים'].filter(Boolean).join(', ');
+  const what=[SY.sv<3?'תמונות והודעות':'',SY.sv<5?'הערות ותגיות':'',SY.sv<7?'סיכום במייל':'',SY.sv<8?'התראות בטלפון':'',SY.sv<9?'קליטה אוטומטית של חיובים מההודעות':'',SY.sv<13?'זיכויים שמקטינים את ההוצאה, העברות בין החשבונות שלך, תיבת "לבדיקה", הוספה בקול עם סירי, וידג׳ט למסך הבית, שותף לצפייה בלבד ועדכונים אוטומטיים':'',SY.sv<14?'תקציב בסכום קבוע, כמה מקדישים לכל קטגוריה':''].filter(Boolean).join(', ');
   const auto=ui.gsMode!=='full';
   return `<div class="card"><h2>עדכון הסקריפט בגיליון</h2><p class="hint">יש גרסה חדשה, עם ${what}. עד שתעדכן, חלק מהדברים נשמרים רק במכשיר. מעדכנים פעם אחת, ממכשיר אחד.</p>
 <div class="seg full" id="gsMode" style="margin-bottom:10px"><button type="button" data-v="auto" aria-pressed="${auto}">עדכונים אוטומטיים מעכשיו</button><button type="button" data-v="full" aria-pressed="${!auto}">רק הפעם</button></div>
