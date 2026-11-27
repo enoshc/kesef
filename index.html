@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=11">
+<link rel="stylesheet" href="app.css?v=12">
 </head>
 <body>
 <div class="bgfx" id="bgfx" aria-hidden="true"><div class="bgl"></div><div class="bgl"></div><div class="bgveil"></div></div>
@@ -42,6 +42,10 @@
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M20 4L3 11l7 3 3 7z"/><path d="M10 14l10-10"/></symbol>
   <symbol id="i-note" viewBox="0 0 24 24"><path d="M5 4h14v12l-4 4H5z"/><path d="M15 20v-4h4M8 9h8M8 13h5"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 2l3 3-3 3"/><path d="M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3"/><path d="M20 13v2a4 4 0 0 1-4 4H4"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></symbol>
   <symbol id="i-sheet" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 10h16M4 15h16M10 4v16"/></symbol>
 </defs></svg>
 
@@ -55,6 +59,7 @@
     <a href="#home" data-nav="home"><svg class="ic"><use href="#i-home"/></svg>סקירה</a>
     <a href="#tx" data-nav="tx"><svg class="ic"><use href="#i-list"/></svg>תנועות</a>
     <a href="#budget" data-nav="budget"><svg class="ic"><use href="#i-pie"/></svg>תקציב ויעד חיסכון</a>
+    <a href="#reports" data-nav="reports"><svg class="ic"><use href="#i-chart"/></svg>דוחות ומגמות</a>
     <a href="#msgs" data-nav="msgs"><svg class="ic"><use href="#i-chat"/></svg>הודעות<span class="cnt" data-unread hidden></span></a>
     <a href="#album" data-nav="album"><svg class="ic"><use href="#i-img"/></svg>תמונות ורקע</a>
     <hr>
@@ -85,6 +90,7 @@
       <a class="hname" id="hName" href="#profile"></a>
       <p class="big" id="big"></p>
       <p class="sub" id="sub"></p>
+      <p class="fc" id="fc" hidden></p>
       <div class="figs" id="figs"></div>
       <div class="acts">
         <button class="btn pri" data-act="salary">משכורת וחלוקה</button>
@@ -96,6 +102,7 @@
       <div class="note span2" id="noteHome" hidden><span>אלה נתוני דוגמה כדי לראות איך זה עובד. אפשר לערוך אותם או להתחיל מאפס.</span><button class="btn sm" data-act="fresh">התחל טבלה ריקה</button></div>
       <div class="card msgcard" id="homeMsg" hidden></div>
       <div class="card albumcard" id="homeAlbum" hidden></div>
+      <div class="card" id="homeFc" hidden></div>
       <div class="card" id="alerts">
         <div class="ch"><h2>התראות</h2><a href="#budget" class="lnk">הגדרות</a></div>
         <ul class="al" id="alList"></ul>
@@ -131,6 +138,7 @@
       <div class="tools">
         <input class="field" type="search" id="q" placeholder="חיפוש בתיאור, הערה, קטגוריה או סכום" aria-label="חיפוש">
         <select class="field" id="catF" aria-label="סינון לפי קטגוריה"></select>
+        <select class="field" id="tagF" aria-label="סינון לפי תגית" hidden></select>
       </div>
       <div class="tools">
         <div class="seg" id="typeF"><button data-v="all" aria-pressed="true">הכול</button><button data-v="exp" aria-pressed="false">הוצאות</button><button data-v="inc" aria-pressed="false">הכנסות</button></div>
@@ -141,6 +149,7 @@
         <button class="btn solid sm" id="addRow" hidden>שורה חדשה</button>
         <button class="btn sm" data-act="undo">ביטול פעולה</button>
         <button class="btn sm" id="copyTsv">העתק לאקסל</button>
+        <button class="btn sm" data-act="bulktag"><svg class="ic"><use href="#i-tag"/></svg>תיוג לפי תאריכים</button>
         <span class="tsum" id="tsum"></span>
       </div>
       <div id="txList"></div>
@@ -174,6 +183,11 @@
         <div class="srow"><span></span><button class="btn sm" id="addI">+ קטגוריית הכנסה</button></div>
       </div>
       <div class="card span2">
+        <div class="ch"><h2>הוצאות והכנסות קבועות</h2><button class="btn solid sm" id="recAdd"><svg class="ic"><use href="#i-plus"/></svg>הוספה</button></div>
+        <p class="hint">שכר דירה, סלולר, ביטוח, מנויים או משכורת קבועה. הן נכנסות לבד בכל חודש ביום שבחרת, ונכללות בצפי לסוף החודש.</p>
+        <div id="recList"></div>
+      </div>
+      <div class="card span2">
         <h2>חלוקת המשכורת</h2>
         <p class="hint" id="pctSum"></p>
         <div class="sheet"><table class="set"><thead><tr><th>צבע</th><th>הוצאה</th><th style="text-align:end">% מהמשכורת</th><th style="text-align:end">תקציב</th><th style="text-align:end">בפועל</th><th></th></tr></thead><tbody id="setE"></tbody></table></div>
@@ -197,6 +211,10 @@
 
   <section class="view" data-view="sync" hidden>
     <div class="pad stack" id="syncBody"></div>
+  </section>
+
+  <section class="view" data-view="reports" hidden>
+    <div class="pad grid2" id="repBody"></div>
   </section>
 
   <section class="view" data-view="msgs" hidden>
@@ -317,6 +335,8 @@
       <label>תאריך<input class="field" id="txD" type="date"></label>
       <label>תיאור<input class="field" id="txN" maxlength="120" placeholder="למשל: סופר"></label>
     </div>
+    <div><div class="lbl">תגיות</div><div class="tags" id="txTags"></div><input class="field" id="txTagIn" list="tagList" maxlength="30" placeholder="למשל: טיול תאילנד. Enter כדי להוסיף" aria-label="תגית חדשה"><datalist id="tagList"></datalist></div>
+    <label class="chk" id="txRecL"><input type="checkbox" id="txRec">חוזרת כל חודש באותו יום</label>
     <label>הערה<textarea class="field" id="txO" rows="2" maxlength="500" placeholder="למשל: מתנה ליום ההולדת של אמא, לבקש החזר מהעבודה"></textarea></label>
     <div>
       <div class="lbl">קבלה או תמונה</div>
@@ -327,6 +347,34 @@
     <p class="err" id="txErr"></p>
   </div>
   <div class="df"><button class="btn solid" type="submit">שמור</button><button class="btn" type="button" data-close>ביטול</button><button class="btn danger" type="button" id="txDel" hidden>מחק</button></div>
+</form></dialog>
+
+<dialog id="dRec"><form id="recF">
+  <div class="grab"></div>
+  <div class="dh"><h2 id="recT">קבועה חדשה</h2><button type="button" class="icon" data-close aria-label="סגירה"><svg class="ic"><use href="#i-x"/></svg></button></div>
+  <div class="db">
+    <div class="seg full" id="recSeg"><button type="button" data-v="exp" aria-pressed="true">הוצאה</button><button type="button" data-v="inc" aria-pressed="false">הכנסה</button></div>
+    <div class="row2"><label>שם<input class="field" id="recN" maxlength="60" placeholder="למשל: שכר דירה"></label><label>סכום בש״ח<input class="field" id="recA" type="number" inputmode="decimal" min="0" step="0.01"></label></div>
+    <label>קטגוריה<select class="field" id="recC"></select></label>
+    <div class="row2"><label>יום בחודש<input class="field" id="recD" type="number" min="1" max="31" inputmode="numeric"></label><label>החל מחודש<input class="field" id="recS" type="month"></label></div>
+    <label class="chk"><input type="checkbox" id="recOn" checked>פעילה</label>
+    <p class="err" id="recErr"></p>
+  </div>
+  <div class="df"><button class="btn solid" type="submit">שמור</button><button class="btn" type="button" data-close>ביטול</button><button class="btn danger" type="button" id="recDel" hidden>מחק</button></div>
+</form></dialog>
+
+<dialog id="dTag"><form id="tagF2">
+  <div class="grab"></div>
+  <div class="dh"><h2>תיוג לפי תאריכים</h2><button type="button" class="icon" data-close aria-label="סגירה"><svg class="ic"><use href="#i-x"/></svg></button></div>
+  <div class="db">
+    <p class="hint" style="margin:0">למשל כל ההוצאות בטיול: בוחרים תגית ותאריכים, וכל התנועות בטווח מקבלות אותה.</p>
+    <label>תגית<input class="field" id="btName" list="tagList" maxlength="30" placeholder="למשל: תאילנד 2025"></label>
+    <div class="row2"><label>מתאריך<input class="field" id="btFrom" type="date"></label><label>עד תאריך<input class="field" id="btTo" type="date"></label></div>
+    <label class="chk"><input type="checkbox" id="btExp" checked>רק הוצאות</label>
+    <p class="okt" id="btCount"></p>
+    <p class="err" id="btErr"></p>
+  </div>
+  <div class="df"><button class="btn solid" type="submit">תייג</button><button class="btn" type="button" data-close>ביטול</button><button class="btn danger" type="button" id="btRemove">הסר את התגית מהטווח</button></div>
 </form></dialog>
 
 <dialog id="dSal"><form id="salF">
@@ -382,6 +430,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=10"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

@@ -7,10 +7,10 @@
 var TX = 'תנועות';
 var CFG = 'הגדרות';
 var FOLDER = 'הכסף שלי - קבלות';
-var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's', 'הערה'];
-var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11, note: 12};
+var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's', 'הערה', 'תגיות'];
+var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11, note: 12, tags: 13};
 var TECH = C.s - C.id + 1;
-var VERSION = 4;
+var VERSION = 5;
 var KINDS = {
   msg: {name: 'הודעות', H: ['תאריך', 'מאת', 'הודעה', 'נמחק', 'id', 'u', 's', 'data'], V: 4, D: 3,
     vis: function (it) { return [new Date(it.ts), safe_(it.by), safe_(it.text), it.del ? 'כן' : '']; }},
@@ -42,6 +42,7 @@ function doPost(e) {
     if (req.action === 'sync') return out_(sync_(req));
     if (req.action === 'img') return out_(putImg_(req));
     if (req.action === 'getimg') return out_(getImg_(req));
+    if (req.action === 'weekly') return out_(weekly_(req));
     return out_({ok: false, err: 'action'});
   } catch (err) {
     return out_({ok: false, err: 'server', msg: String(err && err.message || err)});
@@ -82,7 +83,9 @@ function setup_() {
     } catch (e) {}
     sh.hideColumns(C.id + 1, TECH);
   }
-  if (sh.getRange(1, C.note + 1).getValue() !== 'הערה') sh.getRange(1, C.note + 1).setValue('הערה').setFontWeight('bold').setBackground('#00a862').setFontColor('#0b0b10');
+  [[C.note, 'הערה'], [C.tags, 'תגיות']].forEach(function (x) {
+    if (sh.getRange(1, x[0] + 1).getValue() !== x[1]) sh.getRange(1, x[0] + 1).setValue(x[1]).setFontWeight('bold').setBackground('#00a862').setFontColor('#0b0b10');
+  });
   var cf = ss.getSheetByName(CFG);
   if (!cf) {
     cf = ss.insertSheet(CFG);
@@ -113,7 +116,8 @@ function toRow_(t, now, imgs) {
   var img = String(t.img || '');
   return {
     vals: [date, t.t === 'inc' ? 'הכנסה' : 'הוצאה', Math.abs(+t.a || 0), safe_(t.cn), safe_(t.n), '', t.del ? 'כן' : '',
-      String(t.id), String(t.c || ''), img, +t.u || now, now, safe_(String(t.note || '').slice(0, 500))],
+      String(t.id), String(t.c || ''), img, +t.u || now, now, safe_(String(t.note || '').slice(0, 500)),
+      safe_((Array.isArray(t.tags) ? t.tags : []).map(String).join(', ').slice(0, 300))],
     f: img && imgs[img] ? link_(imgs[img]) : ''
   };
 }
@@ -143,7 +147,7 @@ function fromRow_(v, tz) {
   return {
     id: String(v[C.id]), d: ds, t: /הכנס|inc/i.test(String(v[C.t])) ? 'inc' : 'exp',
     a: Math.abs(amt || 0), cn: String(v[C.cn] || ''), n: String(v[C.n] || ''),
-    c: String(v[C.c] || ''), img: String(v[C.img] || ''), u: +v[C.u] || 0, s: +v[C.s] || 0, note: String(v[C.note] || ''),
+    c: String(v[C.c] || ''), img: String(v[C.img] || ''), u: +v[C.u] || 0, s: +v[C.s] || 0, note: String(v[C.note] || ''), tags: String(v[C.tags] || '').split(/\s*,\s*/).filter(String),
     del: del === true || /^(כן|v|x|1|true|yes)$/i.test(String(del).trim())
   };
 }
@@ -336,4 +340,87 @@ function onEdit(e) {
     }
     sh.getRange(start, C.id + 1, cnt, TECH).setValues(tech);
   } catch (err) {}
+}
+
+/** מריצים את הפונקציה הזו פעם אחת מהעורך (Run) כדי לאשר שליחת מיילים ותזמון. */
+function authorize() {
+  MailApp.getRemainingDailyQuota();
+  ScriptApp.getProjectTriggers();
+  DriveApp.getRootFolder();
+  return 'ok';
+}
+
+function weekly_(req) {
+  var props = PropertiesService.getScriptProperties();
+  var emails = (req.emails || []).map(String).map(function (e) { return e.trim(); })
+    .filter(function (e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }).slice(0, 5);
+  var app = /^https:\/\//.test(String(req.app || '')) ? String(req.app) : '';
+  props.setProperty('WEEKLY', JSON.stringify({emails: emails, on: !!req.on, app: app}));
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'weeklyEmail') ScriptApp.deleteTrigger(t); });
+  if (req.on && emails.length) {
+    ScriptApp.newTrigger('weeklyEmail').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(8).inTimezone('Asia/Jerusalem').create();
+  }
+  var sent = false;
+  if (req.test && emails.length) { weeklyEmail(); sent = true; }
+  return {ok: true, v: VERSION, emails: emails, on: !!req.on && emails.length > 0, sent: sent};
+}
+
+function money_(x) {
+  var n = Math.round(Math.abs(x)), s = String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return (x < 0 ? '−' : '') + '₪' + s;
+}
+function h_(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
+
+function weeklyEmail() {
+  var w = {};
+  try { w = JSON.parse(PropertiesService.getScriptProperties().getProperty('WEEKLY') || '{}'); } catch (e) {}
+  if (!w.emails || !w.emails.length) return;
+  var ss = SpreadsheetApp.getActive(), sh = ss.getSheetByName(TX), tz = 'Asia/Jerusalem';
+  var n = sh ? Math.max(0, sh.getLastRow() - 1) : 0;
+  var data = n ? sh.getRange(2, 1, n, H.length).getValues() : [];
+  var tx = data.filter(function (v) { return v[C.id]; }).map(function (v) { return fromRow_(v, tz); }).filter(function (t) { return t.d && !t.del; });
+  var cfg = {};
+  try { cfg = JSON.parse(ss.getSheetByName(CFG).getRange('A2').getValue() || '{}'); } catch (e) {}
+  var cats = cfg.cats || [], byId = {};
+  cats.forEach(function (c) { byId[c.id] = c; });
+  var catOf = function (t) { return byId[t.c] || cats.filter(function (c) { return c.name === t.cn; })[0] || null; };
+  var isSav = function (t) { var c = catOf(t); return !!(c && c.sav); };
+  var now = new Date(), today = Utilities.formatDate(now, tz, 'yyyy-MM-dd'), ym = today.slice(0, 7);
+  var from = Utilities.formatDate(new Date(now.getTime() - 7 * 864e5), tz, 'yyyy-MM-dd');
+  var sum = function (arr, f) { return arr.filter(f).reduce(function (s, t) { return s + t.a; }, 0); };
+  var week = tx.filter(function (t) { return t.d > from && t.d <= today; });
+  var month = tx.filter(function (t) { return t.d.slice(0, 7) === ym && t.d <= today; });
+  var wSpend = sum(week, function (t) { return t.t === 'exp' && !isSav(t); });
+  var mInc = sum(month, function (t) { return t.t === 'inc'; });
+  var mSpend = sum(month, function (t) { return t.t === 'exp' && !isSav(t); });
+  var mSav = sum(month, function (t) { return t.t === 'exp' && isSav(t); });
+  var sal = sum(month, function (t) { var c = catOf(t); return t.t === 'inc' && c && c.sal; });
+  var byc = {};
+  week.forEach(function (t) { if (t.t !== 'exp' || isSav(t)) return; var c = catOf(t), k = c ? c.name : (t.cn || 'שונות'); byc[k] = (byc[k] || 0) + t.a; });
+  var top = Object.keys(byc).sort(function (a, b) { return byc[b] - byc[a]; }).slice(0, 5);
+  var ap = (+cfg.alertPct || 80) / 100, alerts = [];
+  cats.forEach(function (c) {
+    if (c.k !== 'exp' || c.sav || !sal) return;
+    var b = sal * (+c.pct || 0) / 100; if (!b) return;
+    var s = sum(month, function (t) { var cc = catOf(t); return t.t === 'exp' && cc && cc.id === c.id; });
+    if (s / b >= ap) alerts.push({name: c.name, s: s, b: b, r: s / b});
+  });
+  alerts.sort(function (a, b) { return b.r - a.r; });
+  var name = cfg.name || 'הכסף שלי', goal = +cfg.goal || 0, net = mInc - mSpend - mSav;
+  var row = function (a, b, col) { return '<tr><td style="padding:6px 0;border-bottom:1px solid #e3efe8">' + a + '</td><td style="padding:6px 0;border-bottom:1px solid #e3efe8;text-align:left;font-weight:bold;' + (col ? 'color:' + col : '') + '">' + b + '</td></tr>'; };
+  var html = '<div dir="rtl" style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:auto;color:#0b0b10">' +
+    '<div style="background:#00a862;padding:20px 22px;border-radius:14px 14px 0 0"><div style="font-size:15px">' + h_(name) + '</div>' +
+    '<div style="font-size:28px;font-weight:bold;margin-top:6px">השבוע הוצאתם ' + money_(wSpend) + '</div>' +
+    '<div style="font-size:15px;margin-top:4px">' + (week.length ? week.length + ' תנועות בשבעה הימים האחרונים' : 'לא נרשמו תנועות השבוע') + '</div></div>' +
+    '<div style="border:1px solid #d5e4dc;border-top:0;border-radius:0 0 14px 14px;padding:18px 22px">' +
+    '<h3 style="margin:0 0 6px">החודש עד היום</h3><table style="width:100%;border-collapse:collapse;font-size:15px">' +
+    row('הכנסות', money_(mInc), '#00804f') + row('הוצאות', money_(mSpend)) + row('הופרש לחיסכון', money_(mSav) + (goal ? ' מתוך ' + money_(goal) : '')) +
+    row(net >= 0 ? 'נשארו' : 'חריגה', money_(Math.abs(net)), net >= 0 ? '#00804f' : '#d1303a') + '</table>' +
+    (top.length ? '<h3 style="margin:18px 0 6px">על מה הלך הכסף השבוע</h3><table style="width:100%;border-collapse:collapse;font-size:15px">' + top.map(function (k) { return row(h_(k), money_(byc[k])); }).join('') + '</table>' : '') +
+    (alerts.length ? '<h3 style="margin:18px 0 6px">שימו לב</h3>' + alerts.map(function (a) {
+      return '<div style="padding:6px 0;color:' + (a.r > 1 ? '#d1303a' : '#a15c00') + '">' + h_(a.name) + ': ' + (a.r > 1 ? 'חריגה של ' + money_(a.s - a.b) : 'ניצלתם ' + Math.round(a.r * 100) + '% מהתקציב') + '</div>';
+    }).join('') : '') +
+    (w.app ? '<p style="margin:20px 0 0"><a href="' + h_(w.app) + '" style="background:#0b0b10;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;display:inline-block">לפתיחת האפליקציה</a></p>' : '') +
+    '<p style="color:#56615b;font-size:12px;margin-top:18px">נשלח מהגיליון "' + h_(ss.getName()) + '" שלכם. כדי להפסיק: באפליקציה, סנכרון משותף, סיכום שבועי.</p></div></div>';
+  MailApp.sendEmail({to: w.emails.join(','), subject: name + ': סיכום שבועי', htmlBody: html, name: name});
 }
