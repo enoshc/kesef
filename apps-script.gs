@@ -10,7 +10,9 @@ var FOLDER = 'הכסף שלי - קבלות';
 var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's', 'הערה', 'תגיות'];
 var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11, note: 12, tags: 13};
 var TECH = C.s - C.id + 1;
-var VERSION = 7;
+var VERSION = 8;
+var DEVS = 'מכשירים';
+var DH = ['dev', 'name', 'endpoint', 'pub', 'prefs', 'tokens', 'queue', 'updated'];
 var KINDS = {
   msg: {name: 'הודעות', H: ['תאריך', 'מאת', 'הודעה', 'נמחק', 'id', 'u', 's', 'data'], V: 4, D: 3,
     vis: function (it) { return [new Date(it.ts), safe_(it.by), safe_(it.text), it.del ? 'כן' : '']; }},
@@ -43,6 +45,11 @@ function doPost(e) {
     if (req.action === 'img') return out_(putImg_(req));
     if (req.action === 'getimg') return out_(getImg_(req));
     if (req.action === 'weekly') return out_(weekly_(req));
+    if (req.action === 'push-reg') return out_(pushReg_(req));
+    if (req.action === 'push-prefs') return out_(pushPrefs_(req));
+    if (req.action === 'push-unreg') { removeDev_(String(req.dev || '')); return out_({ok: true, v: VERSION}); }
+    if (req.action === 'push-test') return out_(pushTest_(req));
+    if (req.action === 'notifs') return out_(notifs_(req));
     return out_({ok: false, err: 'action'});
   } catch (err) {
     return out_({ok: false, err: 'server', msg: String(err && err.message || err)});
@@ -173,7 +180,7 @@ function sync_(req) {
     if (at !== undefined) {
       if ((+t.u || 0) >= (+data[at][C.u] || 0)) { data[at] = row.vals; writeRow_(sh, at + 2, row); sent[t.id] = 1; }
     } else {
-      idx[t.id] = data.length; data.push(row.vals); append.push(row); sent[t.id] = 1;
+      row.t = t; idx[t.id] = data.length; data.push(row.vals); append.push(row); sent[t.id] = 1;
     }
   });
   if (append.length) {
@@ -197,6 +204,10 @@ function sync_(req) {
     try { cfg = JSON.parse(cv[0]); } catch (e) {}
   }
   var it = syncItems_(req, since, now, imgs);
+  try {
+    var curCfg = (req.cfg && (+req.cfg.u || 0) >= cu) ? req.cfg : JSON.parse(cv[0] || '{}');
+    notify_(req, append, it.newMsgs, data, curCfg, tz, now);
+  } catch (e) {}
   return {ok: true, v: VERSION, now: now, tx: out, ids: req.full ? ids : undefined, cfg: cfg,
     items: it.items, itemIds: req.full ? it.ids : undefined, sheet: SpreadsheetApp.getActive().getUrl()};
 }
@@ -226,7 +237,7 @@ function linkPic_(sh, k, r, it, imgs) {
 }
 
 function syncItems_(req, since, now, imgs) {
-  var incoming = {}, out = [], ids = [];
+  var incoming = {}, out = [], ids = [], newMsgs = [];
   (req.items || []).forEach(function (it) {
     if (it && it.id && KINDS[it.k]) (incoming[it.k] = incoming[it.k] || []).push(cleanItem_(it, it.k, now));
   });
@@ -248,6 +259,7 @@ function syncItems_(req, since, now, imgs) {
         }
       } else {
         idx[it.id] = data.length; data.push(row); app.push({row: row, it: it}); sent[it.id] = 1;
+        if (k === 'msg' && !it.del) newMsgs.push(it);
       }
     });
     if (app.length) {
@@ -269,7 +281,7 @@ function syncItems_(req, since, now, imgs) {
       }
     }
   });
-  return {items: out, ids: ids};
+  return {items: out, ids: ids, newMsgs: newMsgs};
 }
 
 function writeCats_(cf, cfg) {
@@ -347,6 +359,7 @@ function authorize() {
   MailApp.getRemainingDailyQuota();
   ScriptApp.getProjectTriggers();
   DriveApp.getRootFolder();
+  UrlFetchApp.getRequest('https://web.push.apple.com/');
   return 'ok';
 }
 
@@ -490,4 +503,138 @@ function monthlyEmail() {
     (w.app ? '<p style="margin:20px 0 0"><a href="' + h_(w.app) + '" style="background:#0b0b10;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;display:inline-block">לפתיחת האפליקציה</a></p>' : '') +
     '<p style="color:#56615b;font-size:12px;margin-top:18px">נשלח מהגיליון "' + h_(ss.getName()) + '" שלכם. כדי לשנות או להפסיק: באפליקציה, סנכרון משותף, סיכום במייל.</p></div></div>';
   MailApp.sendEmail({to: w.emails.join(','), subject: name + ': סיכום ' + mn, htmlBody: html, name: name});
+}
+
+/* ---------- התראות בטלפון ---------- */
+function devSheet_() {
+  var ss = SpreadsheetApp.getActive(), sh = ss.getSheetByName(DEVS);
+  if (!sh) { sh = ss.insertSheet(DEVS); sh.getRange(1, 1, 1, DH.length).setValues([DH]); try { sh.hideSheet(); } catch (e) {} }
+  return sh;
+}
+function devs_() {
+  var sh = devSheet_(), n = Math.max(0, sh.getLastRow() - 1), v = n ? sh.getRange(2, 1, n, DH.length).getValues() : [];
+  return v.map(function (r, i) {
+    var o = {row: i + 2, dev: String(r[0] || ''), name: String(r[1] || ''), endpoint: String(r[2] || ''), pub: String(r[3] || '')};
+    try { o.prefs = JSON.parse(r[4] || '{}'); } catch (e) { o.prefs = {}; }
+    try { o.tokens = JSON.parse(r[5] || '[]'); } catch (e) { o.tokens = []; }
+    try { o.queue = JSON.parse(r[6] || '[]'); } catch (e) { o.queue = []; }
+    return o;
+  }).filter(function (o) { return o.dev; });
+}
+function saveDev_(o) {
+  var sh = devSheet_();
+  var row = [o.dev, o.name || '', o.endpoint || '', o.pub || '', JSON.stringify(o.prefs || {}), JSON.stringify(o.tokens || []), JSON.stringify((o.queue || []).slice(-20)), Date.now()];
+  if (o.row) sh.getRange(o.row, 1, 1, DH.length).setValues([row]);
+  else { sh.getRange(sh.getLastRow() + 1, 1, 1, DH.length).setValues([row]); o.row = sh.getLastRow(); }
+}
+function removeDev_(dev) {
+  var sh = devSheet_(), n = Math.max(0, sh.getLastRow() - 1);
+  if (!n || !dev) return;
+  var v = sh.getRange(2, 1, n, 1).getValues();
+  for (var i = n - 1; i >= 0; i--) if (String(v[i][0]) === dev) sh.deleteRow(i + 2);
+}
+function findDev_(dev) { return devs_().filter(function (x) { return x.dev === dev; })[0] || null; }
+function okEndpoint_(u) {
+  return /^https:\/\/([a-z0-9-]+\.)*(push\.apple\.com|fcm\.googleapis\.com|push\.services\.mozilla\.com|notify\.windows\.com)\//i.test(String(u || ''));
+}
+function cleanPrefs_(p) { p = p || {}; return {tx: p.tx !== false, msg: p.msg !== false, budget: p.budget !== false, rec: p.rec !== false}; }
+function pushReg_(req) {
+  var dev = String(req.dev || '').replace(/[^a-z0-9]/gi, '').slice(0, 20);
+  if (!dev || !okEndpoint_(req.endpoint) || !/^[A-Za-z0-9_-]{80,100}$/.test(String(req.pub || ''))) return {ok: false, err: 'push'};
+  var tokens = (req.tokens || []).filter(function (x) { return x && typeof x.e === 'number' && /^[A-Za-z0-9_.-]+$/.test(String(x.t)); })
+    .slice(0, 120).map(function (x) { return {e: x.e, t: String(x.t)}; });
+  var d = findDev_(dev) || {dev: dev, queue: []};
+  d.name = String(req.name || '').slice(0, 30); d.endpoint = String(req.endpoint); d.pub = String(req.pub); d.tokens = tokens; d.prefs = cleanPrefs_(req.prefs);
+  saveDev_(d);
+  return {ok: true, v: VERSION};
+}
+function pushPrefs_(req) {
+  var d = findDev_(String(req.dev || ''));
+  if (!d) return {ok: false, err: 'nodev'};
+  d.prefs = cleanPrefs_(req.prefs); saveDev_(d);
+  return {ok: true, v: VERSION};
+}
+function notifs_(req) {
+  var d = findDev_(String(req.dev || ''));
+  if (!d) return {ok: true, items: []};
+  var items = d.queue || []; d.queue = []; saveDev_(d);
+  return {ok: true, items: items};
+}
+function pushTest_(req) {
+  var d = findDev_(String(req.dev || ''));
+  if (!d) return {ok: false, err: 'nodev'};
+  d.queue = (d.queue || []).concat([{title: 'הכסף שלי', body: 'ההתראות פועלות. כך תיראה התראה מהאפליקציה.', type: 'test', ts: Date.now()}]);
+  saveDev_(d);
+  return {ok: true, v: VERSION, codes: deliver_([d])};
+}
+function pickTok_(tokens) {
+  var now = Date.now() / 1000, best = null;
+  (tokens || []).forEach(function (x) { if (x && x.e > now + 120 && x.e <= now + 86400 && (!best || x.e < best.e)) best = x; });
+  return best ? best.t : '';
+}
+function deliver_(list) {
+  var reqs = [], who = [];
+  list.forEach(function (d) {
+    var t = pickTok_(d.tokens);
+    if (!t || !okEndpoint_(d.endpoint)) return;
+    reqs.push({url: d.endpoint, method: 'post', headers: {TTL: '86400', Urgency: 'high', Authorization: 'vapid t=' + t + ', k=' + d.pub}, muteHttpExceptions: true});
+    who.push(d);
+  });
+  if (!reqs.length) return [];
+  var codes = [];
+  UrlFetchApp.fetchAll(reqs).forEach(function (r, i) {
+    var c = r.getResponseCode(); codes.push(c);
+    if (c === 404 || c === 410) removeDev_(who[i].dev);
+  });
+  return codes;
+}
+function budgetEvents_(data, cfg, tz) {
+  var cats = (cfg && cfg.cats) || [], ap = (+(cfg && cfg.alertPct) || 80) / 100;
+  if (!cats.length) return [];
+  var ym = Utilities.formatDate(new Date(), tz, 'yyyy-MM'), byId = {};
+  cats.forEach(function (c) { byId[c.id] = c; });
+  var catOf = function (t) { return byId[t.c] || cats.filter(function (c) { return c.name === t.cn; })[0]; };
+  var sal = 0, sp = {};
+  data.forEach(function (v) {
+    if (!v[C.id]) return;
+    var t = fromRow_(v, tz);
+    if (t.del || t.d.slice(0, 7) !== ym) return;
+    var c = catOf(t); if (!c) return;
+    if (t.t === 'inc' && c.sal) sal += t.a;
+    if (t.t === 'exp') sp[c.id] = (sp[c.id] || 0) + t.a;
+  });
+  var props = PropertiesService.getScriptProperties(), key = 'BL_' + ym, lv = {};
+  try { lv = JSON.parse(props.getProperty(key) || '{}'); } catch (e) {}
+  var ev = [], changed = false;
+  cats.forEach(function (c) {
+    if (c.k !== 'exp' || c.sav || !sal || !(+c.pct)) return;
+    var b = sal * c.pct / 100, s = sp[c.id] || 0, l = s > b + 0.5 ? 2 : (s >= ap * b ? 1 : 0), old = lv[c.id] || 0;
+    if (l > old) ev.push({type: 'budget', title: 'התראת תקציב', body: l === 2 ? c.name + ': חריגה של ' + money_(s - b) + ' מהתקציב' : c.name + ': ניצלתם ' + Math.round(s / b * 100) + '% מהתקציב, נשארו ' + money_(b - s)});
+    if (l !== old) { lv[c.id] = l; changed = true; }
+  });
+  if (changed) props.setProperty(key, JSON.stringify(lv));
+  return ev;
+}
+function notify_(req, appended, newMsgs, data, cfg, tz, now) {
+  var devs = devs_();
+  if (!devs.length) return;
+  var me = String(req.me || '').slice(0, 30) || 'השותף', from = String(req.dev || ''), ev = [];
+  var REC = /^r[a-z0-9]{8}\d{6}$/;
+  var added = appended.map(function (x) { return x.t; }).filter(function (t) { return t && !t.del; });
+  var man = added.filter(function (t) { return !REC.test(t.id); }), rec = added.filter(function (t) { return REC.test(t.id); });
+  if (man.length > 3) ev.push({type: 'tx', title: me, body: 'נוספו ' + man.length + ' תנועות חדשות'});
+  else man.forEach(function (t) { ev.push({type: 'tx', title: me, body: (t.t === 'inc' ? 'הכנסה חדשה של ' : 'הוצאה חדשה של ') + money_(+t.a || 0) + (t.n ? ': ' + t.n : (t.cn ? ': ' + t.cn : ''))}); });
+  rec.forEach(function (t) { ev.push({type: 'rec', all: true, title: t.t === 'inc' ? 'הכנסה קבועה נכנסה' : 'הוצאה קבועה ירדה', body: (t.n || t.cn || '') + ': ' + money_(+t.a || 0)}); });
+  (newMsgs || []).forEach(function (m) { ev.push({type: 'msg', title: 'הודעה מ' + (m.by || me), body: String(m.text || '').slice(0, 180)}); });
+  if (added.length) budgetEvents_(data, cfg, tz).forEach(function (e) { e.all = true; ev.push(e); });
+  if (!ev.length) return;
+  var hit = [];
+  devs.forEach(function (d) {
+    var p = cleanPrefs_(d.prefs);
+    var mine = ev.filter(function (e) { return (e.all || d.dev !== from) && p[e.type]; });
+    if (!mine.length) return;
+    d.queue = (d.queue || []).concat(mine.map(function (e) { return {title: e.title, body: e.body, type: e.type, ts: now}; })).slice(-20);
+    saveDev_(d); hit.push(d);
+  });
+  deliver_(hit);
 }

@@ -79,18 +79,18 @@ const LS='kesef-li-v1',LSY='kesef-sync-v1',LSU='kesef-ui-v1';
 let S=blank(),sample=false,hist=[];
 let SY={on:false,url:'',key:'',since:0,dirty:[],idirty:[],cfgDirty:false,last:0,err:'',sheet:'',sv:0};
 const wide=matchMedia('(min-width:900px)').matches;
-const ui={view:'home',cur:nowYm,scope:'month',typeF:'all',catF:'',tagF:'',q:'',sortK:'d',sortD:-1,mode:wide?'grid':'list',me:'',dev:'',read:0,ss:{int:8,idle:0,info:true},bg:{mode:'hero',int:10}};
+const ui={view:'home',cur:nowYm,scope:'month',typeF:'all',catF:'',tagF:'',q:'',sortK:'d',sortD:-1,mode:wide?'grid':'list',me:'',dev:'',read:0,ss:{int:8,idle:0,info:true},bg:{mode:'hero',int:10},push:{on:false,cov:0,prefs:{tx:true,msg:true,budget:true,rec:true}}};
 function load(){
   let raw=null;try{raw=localStorage.getItem(LS)}catch{}
   if(raw){try{S=norm(JSON.parse(raw));sample=false}catch{S=norm(sampleData());sample=true}}else{S=norm(sampleData());sample=true}
   try{const y=JSON.parse(localStorage.getItem(LSY)||'null');if(y&&typeof y==='object')SY={...SY,...y,dirty:Array.isArray(y.dirty)?y.dirty:[],idirty:Array.isArray(y.idirty)?y.idirty:[]}}catch{}
-  try{const u=JSON.parse(localStorage.getItem(LSU)||'null');if(u){if(u.mode==='list'||u.mode==='grid')ui.mode=u.mode;ui.me=String(u.me||'').slice(0,40);ui.dev=String(u.dev||'');ui.read=+u.read||0;if(u.ss)ui.ss={int:clamp(+u.ss.int||8,3,120),idle:clamp(+u.ss.idle||0,0,60),info:u.ss.info!==false};if(u.bg)ui.bg={mode:['hero','app','off'].includes(u.bg.mode)?u.bg.mode:'hero',int:clamp(+u.bg.int||10,3,300)}}}catch{}
+  try{const u=JSON.parse(localStorage.getItem(LSU)||'null');if(u){if(u.mode==='list'||u.mode==='grid')ui.mode=u.mode;ui.me=String(u.me||'').slice(0,40);ui.dev=String(u.dev||'');ui.read=+u.read||0;if(u.ss)ui.ss={int:clamp(+u.ss.int||8,3,120),idle:clamp(+u.ss.idle||0,0,60),info:u.ss.info!==false};if(u.push&&typeof u.push==='object')ui.push={on:!!u.push.on,cov:+u.push.cov||0,prefs:{tx:u.push.prefs?.tx!==false,msg:u.push.prefs?.msg!==false,budget:u.push.prefs?.budget!==false,rec:u.push.prefs?.rec!==false}};if(u.bg)ui.bg={mode:['hero','app','off'].includes(u.bg.mode)?u.bg.mode:'hero',int:clamp(+u.bg.int||10,3,300)}}}catch{}
   if(!/^[a-z0-9]{8,}$/.test(ui.dev))ui.dev=rid(10);
 }
 let saveT=null,storageOk=true;
 function persist(){clearTimeout(saveT);saveT=setTimeout(persistNow,150)}
 function persistNow(){
-  try{if(!sample)localStorage.setItem(LS,JSON.stringify(S));localStorage.setItem(LSY,JSON.stringify(SY));localStorage.setItem(LSU,JSON.stringify({mode:ui.mode,me:ui.me,dev:ui.dev,read:ui.read,ss:ui.ss,bg:ui.bg}));storageOk=true}
+  try{if(!sample)localStorage.setItem(LS,JSON.stringify(S));localStorage.setItem(LSY,JSON.stringify(SY));localStorage.setItem(LSU,JSON.stringify({mode:ui.mode,me:ui.me,dev:ui.dev,read:ui.read,ss:ui.ss,bg:ui.bg,push:ui.push}));storageOk=true}
   catch{storageOk=false}
   chrome();
 }
@@ -198,7 +198,7 @@ const Sync={busy:false,again:false,timer:null,upBusy:false,
       const iids=[...new Set(SY.idirty)],sentI={};
       const items=iids.map(id=>{const t=S.items.find(x=>x.id===id);if(!t)return null;sentI[id]=t.u;return {...t,del:t.del?1:0}}).filter(Boolean);
       const cfgSent=SY.cfgDirty,su=S.su;
-      const res=await this.call({action:'sync',since:full?0:SY.since,full,tx,items,cfg:cfgSent?{cats:S.cats,goal:G(),alertPct:AP(),name:S.profile.name,rec:S.rec,rules:S.rules,weekly:S.weekly,u:S.su}:null});
+      const res=await this.call({action:'sync',dev:ui.dev,me:ui.me,since:full?0:SY.since,full,tx,items,cfg:cfgSent?{cats:S.cats,goal:G(),alertPct:AP(),name:S.profile.name,rec:S.rec,rules:S.rules,weekly:S.weekly,u:S.su}:null});
       if(!res||!res.ok)throw new Error(res&&res.err||'server');
       SY.dirty=SY.dirty.filter(id=>{const t=S.tx.find(x=>x.id===id);return t&&t.u!==sentU[id]});
       if(cfgSent&&S.su===su)SY.cfgDirty=false;
@@ -318,7 +318,7 @@ async function startSync(url,key,merge,sheet,v){
   else{S.tx=[];S.items=[];S.su=0}
   if(merge){const used=[...new Set(TX().map(t=>t.img).concat(ITEMS('pic').map(p=>p.img)).filter(Boolean))];
     for(const k of used){try{const x=await IDB.get('i:'+k);if(x&&x.up){x.up=false;await IDB.put('i:'+k,x)}}catch{}}}
-  hist=[];persistNow();render();Sync.run(true);
+  hist=[];persistNow();saveSyncInfo();render();Sync.run(true);
 }
 
 /* ---------- toast, dialogs ---------- */
@@ -512,8 +512,9 @@ function renderSyncInner(b){
 ${syncStatusHtml()}
 <p class="hint">כל שינוי שאתה עושה נשלח לגיליון, והאפליקציה בודקת עדכונים מהמכשירים האחרים כל 20 שניות. אפשר גם לערוך ישירות בגיליון, והשינויים יגיעו לאפליקציה.</p>
 <div class="btnrow"><button class="btn solid" data-act="sync-now">סנכרן עכשיו</button>${SY.sheet&&/^https:\/\//.test(SY.sheet)?`<a class="btn" href="${esc(SY.sheet)}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-sheet"/></svg>פתח את הגיליון</a>`:''}</div></div>
-${SY.sv&&SY.sv<7?`<div class="card"><h2>עדכון הסקריפט בגיליון</h2><p class="hint">יש גרסה חדשה של הסקריפט, עם ${[SY.sv<3?'תמונות והודעות':'',SY.sv<4?'הערות':'',SY.sv<5?'תגיות':'','סיכום חודשי ושבועי במייל'].filter(Boolean).join(', ')}. עד שתעדכן, הן נשמרות רק במכשיר ויישלחו אחרי העדכון. מעדכנים פעם אחת, ממכשיר אחד:</p><ol class="steps"><li><div><b>פותחים את עורך הסקריפטים</b><p>בגיליון: <kbd>Extensions</kbd> ← <kbd>Apps Script</kbd>.</p></div></li><li><div><b>מחליפים את הקוד</b><p>מוחקים את כל הקוד הישן, מדביקים את החדש ושומרים.</p><button class="btn solid sm" data-act="copy-gs">העתק את הקוד החדש</button></div></li><li><div><b>מאשרים שליחת מיילים</b><p>למעלה בעורך, בתפריט שליד <kbd>Debug</kbd> בוחרים את הפונקציה <kbd>authorize</kbd> ולוחצים <kbd>Run</kbd>. מאשרים את ההרשאות כמו בפעם הראשונה.</p></div></li><li><div><b>מפרסמים גרסה חדשה</b><p><kbd>Deploy</kbd> ← <kbd>Manage deployments</kbd> ← סמל העיפרון ← ב־<kbd>Version</kbd> בוחרים <kbd>New version</kbd> ← <kbd>Deploy</kbd>. הכתובת לא משתנה ואין צורך לחבר מחדש.</p></div></li></ol><button class="btn sm" data-act="sync-now">בדוק שוב</button></div>`:''}
+${SY.sv&&SY.sv<8?`<div class="card"><h2>עדכון הסקריפט בגיליון</h2><p class="hint">יש גרסה חדשה של הסקריפט, עם ${[SY.sv<3?'תמונות והודעות':'',SY.sv<4?'הערות':'',SY.sv<5?'תגיות':'',SY.sv<7?'סיכום חודשי ושבועי במייל':'','התראות בטלפון'].filter(Boolean).join(', ')}. עד שתעדכן, הן נשמרות רק במכשיר ויישלחו אחרי העדכון. מעדכנים פעם אחת, ממכשיר אחד:</p><ol class="steps"><li><div><b>פותחים את עורך הסקריפטים</b><p>בגיליון: <kbd>Extensions</kbd> ← <kbd>Apps Script</kbd>.</p></div></li><li><div><b>מחליפים את הקוד</b><p>מוחקים את כל הקוד הישן, מדביקים את החדש ושומרים.</p><button class="btn solid sm" data-act="copy-gs">העתק את הקוד החדש</button></div></li><li><div><b>מאשרים שליחת מיילים</b><p>למעלה בעורך, בתפריט שליד <kbd>Debug</kbd> בוחרים את הפונקציה <kbd>authorize</kbd> ולוחצים <kbd>Run</kbd>. מאשרים את ההרשאות כמו בפעם הראשונה.</p></div></li><li><div><b>מפרסמים גרסה חדשה</b><p><kbd>Deploy</kbd> ← <kbd>Manage deployments</kbd> ← סמל העיפרון ← ב־<kbd>Version</kbd> בוחרים <kbd>New version</kbd> ← <kbd>Deploy</kbd>. הכתובת לא משתנה ואין צורך לחבר מחדש.</p></div></li></ol><button class="btn sm" data-act="sync-now">בדוק שוב</button></div>`:''}
 ${weeklyCard()}
+${pushCard()}
 <div class="card"><h2>הוספת שותף</h2><p class="hint">שלח את הקוד הזה למי שמנהל איתך את החשבון. הוא פותח את האפליקציה, נכנס לסנכרון משותף ובוחר "הצטרפות עם קוד". מי שיש לו את הקוד יכול לראות ולשנות את הנתונים, אז שלח אותו רק למי שאתה סומך עליו.</p>
 <textarea class="field code" readonly rows="3" id="invTxt">${esc(inviteCode())}</textarea>
 <div class="btnrow"><button class="btn solid" data-act="share-code">שלח קוד הצטרפות</button><button class="btn" data-act="copy-code">העתק</button></div></div>
@@ -725,10 +726,10 @@ const ACT={
   'sync-now':()=>Sync.run(true),
   'copy-code':()=>copyText(inviteCode(),'קוד ההצטרפות הועתק','קוד הצטרפות'),
   'share-code':async()=>{const text=`קוד הצטרפות לחשבון המשותף שלנו ב"הכסף שלי":\n${inviteCode()}\n\nפותחים את ${APP_URL} ← תפריט ← סנכרון משותף ← הצטרפות עם קוד.`;if(navigator.share){try{await navigator.share({title:'הכסף שלי, קוד הצטרפות',text});return}catch(e){if(e&&e.name==='AbortError')return}}copyText(text,'ההזמנה הועתקה, הדבק אותה בוואטסאפ','הזמנה')},
-  disconnect:async()=>{if(!(await ask('לנתק את המכשיר?','המכשיר יפסיק לסנכרן. הנתונים נשארים במכשיר ובגיליון, ואפשר להצטרף שוב עם הקוד.','נתק')))return;SY={...SY,on:false,dirty:[],idirty:[],cfgDirty:false};S.tx=S.tx.filter(t=>!t.del);S.items=S.items.filter(t=>!t.del);persistNow();setSync('off');render();toast('המכשיר נותק מהגיליון')},
+  disconnect:async()=>{if(!(await ask('לנתק את המכשיר?','המכשיר יפסיק לסנכרן. הנתונים נשארים במכשיר ובגיליון, ואפשר להצטרף שוב עם הקוד.','נתק')))return;PUSH.disable();IDB.del('sync').catch(()=>{});SY={...SY,on:false,dirty:[],idirty:[],cfgDirty:false};S.tx=S.tx.filter(t=>!t.del);S.items=S.items.filter(t=>!t.del);persistNow();setSync('off');render();toast('המכשיר נותק מהגיליון')},
   'disconnect-wipe':async()=>{if(!(await ask('לנתק ולמחוק מהמכשיר?','המכשיר יתנתק, וכל התנועות, ההודעות והתמונות יימחקו ממנו. בגיליון ואצל המחוברים האחרים לא ישתנה כלום.','נתק ומחק',true)))return;
     const imgs=[...new Set(S.tx.map(t=>t.img).concat(S.items.map(i=>i.img)).filter(Boolean))];for(const k of imgs){try{await IDB.del('i:'+k)}catch{}}
-    SY={on:false,url:'',key:'',since:0,dirty:[],idirty:[],cfgDirty:false,last:0,err:'',sheet:'',sv:0};S=blank();sample=false;hist=[];ui.read=0;
+    PUSH.disable();IDB.del('sync').catch(()=>{});SY={on:false,url:'',key:'',since:0,dirty:[],idirty:[],cfgDirty:false,last:0,err:'',sheet:'',sv:0};S=blank();sample=false;hist=[];ui.read=0;
     URLS.forEach(u=>URL.revokeObjectURL(u));URLS.clear();persistNow();setSync('off');render();toast('המכשיר נותק והנתונים נמחקו ממנו')},
   'copy-gs':()=>{if(!GS){toast('הקוד עוד לא נטען, נסה שוב בעוד רגע');return}copyText(GS,'הקוד הועתק. הדבק אותו בעורך של Apps Script','קוד הסקריפט')},
   'show-gs':()=>{if(GS)showText('קוד הסקריפט','מעתיקים את כל הטקסט ומדביקים בעורך של Apps Script.',GS)},
@@ -738,6 +739,11 @@ const ACT={
   join:async(btn)=>{const er=$('#joinErr');er.textContent='';const code=$('#joinCode').value;if(!dec(code)){er.textContent='הקוד לא נראה תקין. הוא מתחיל ב־KSF1.';return}
     btn.disabled=true;btn.textContent='מצטרף…';try{await connectJoin(code,$('#joinMerge').checked);toast('הצטרפת לחשבון המשותף');renderSync()}catch(e){er.textContent=e.message==='code'?'הקוד לא תקין.':errText(e);btn.disabled=false;btn.textContent='הצטרף'}},
   ss:()=>SS.start(),
+  'push-on':async b=>{const er=$('#pErr');er.textContent='';b.disabled=true;b.textContent='מפעיל…';
+    try{await PUSH.enable();renderSync();toast('ההתראות הופעלו במכשיר הזה')}
+    catch(e){const m=String(e&&e.message||e);er.textContent=m==='standalone'?'באייפון צריך קודם להוסיף את האפליקציה למסך הבית ולפתוח אותה משם.':m==='denied'?'לא אישרת התראות. אפשר לאשר בהגדרות הטלפון ← התראות ← הכסף שלי.':m==='unsupported'?'הדפדפן הזה לא תומך בהתראות.':m==='push'||m==='action'?'הסקריפט בגיליון ישן. עדכן אותו לפי ההוראות למעלה.':'לא הצלחתי להפעיל התראות. נסה שוב.';b.disabled=false;b.textContent='הפעל התראות במכשיר הזה'}},
+  'push-off':async()=>{if(!(await ask('לכבות את ההתראות?','המכשיר הזה יפסיק לקבל התראות. אפשר להפעיל שוב בכל רגע.','כבה')))return;await PUSH.disable();renderSync();toast('ההתראות כבויות במכשיר הזה')},
+  'push-test':async b=>{b.disabled=true;try{const r=await Sync.call({action:'push-test',dev:ui.dev});toast(r.ok?'נשלחה התראת בדיקה. היא אמורה להגיע תוך כמה שניות':'לא הצלחתי לשלוח. נסה לכבות ולהפעיל מחדש')}catch(e){toast(errText(e))}b.disabled=false},
   bulktag:()=>openBulkTag(ui.tagF),
   'weekly-save':b=>weeklySave(false,b),
   'weekly-test':b=>weeklySave(true,b),
@@ -1124,8 +1130,71 @@ ${tops.map(o=>`<div class="trow"><span>${esc(o.n.slice(0,40))}<small>${o.c} פע
 }
 $('#repBody').addEventListener('click',e=>{const a=e.target.closest('[data-tag]');if(a){ui.tagF=a.dataset.tag;ui.scope='all'}});
 
+/* ---------- push notifications ---------- */
+const b64u=buf=>bufToB64(buf instanceof ArrayBuffer?buf:buf.buffer.slice(buf.byteOffset,buf.byteOffset+buf.byteLength)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const b64uStr=s=>b64u(new TextEncoder().encode(s));
+const fromB64u=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return new Uint8Array(b64ToBuf(s))};
+async function saveSyncInfo(){if(SY.on)try{await IDB.put('sync',{url:SY.url,key:SY.key,dev:ui.dev})}catch{}}
+const PUSH={
+  supported(){return 'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&!!window.crypto?.subtle},
+  ios(){return /iPhone|iPad|iPod/.test(navigator.userAgent)},
+  standalone(){return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true},
+  async keys(){
+    let v=null;try{v=await IDB.get('vapid')}catch{}
+    if(v&&v.jwk&&v.pub){try{return {priv:await crypto.subtle.importKey('jwk',v.jwk,{name:'ECDSA',namedCurve:'P-256'},false,['sign']),pub:v.pub}}catch{}}
+    const kp=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+    const pub=b64u(await crypto.subtle.exportKey('raw',kp.publicKey)),jwk=await crypto.subtle.exportKey('jwk',kp.privateKey);
+    await IDB.put('vapid',{jwk,pub});return {priv:kp.privateKey,pub};
+  },
+  async tokens(priv,aud,n=90){
+    const h=b64uStr(JSON.stringify({typ:'JWT',alg:'ES256'})),base=Math.floor(Date.now()/1000/43200)*43200,sub=/^https:\/\//.test(APP_URL)?APP_URL:'mailto:kesef-app@users.noreply.github.com',out=[];
+    for(let j=1;j<=n;j++){const e=base+43200*j,p=b64uStr(JSON.stringify({aud,exp:e,sub}));const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},priv,new TextEncoder().encode(h+'.'+p));out.push({e,t:h+'.'+p+'.'+b64u(sig)})}
+    return out;
+  },
+  async register(){
+    const reg=await navigator.serviceWorker.ready,k=await this.keys();
+    let sub=await reg.pushManager.getSubscription();
+    if(sub){const cur=sub.options&&sub.options.applicationServerKey;if(!cur||b64u(cur)!==k.pub){try{await sub.unsubscribe()}catch{}sub=null}}
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:fromB64u(k.pub)});
+    if(!sub||!sub.endpoint)throw new Error('nosub');
+    const toks=await this.tokens(k.priv,new URL(sub.endpoint).origin);
+    const r=await Sync.call({action:'push-reg',dev:ui.dev,name:ui.me,endpoint:sub.endpoint,pub:k.pub,tokens:toks,prefs:ui.push.prefs});
+    if(!r||!r.ok)throw new Error(r&&r.err||'server');
+    ui.push.on=true;ui.push.cov=toks[toks.length-1].e;persistNow();await saveSyncInfo();
+  },
+  async enable(){
+    if(this.ios()&&!this.standalone())throw new Error('standalone');
+    if(!this.supported())throw new Error('unsupported');
+    const perm=await Notification.requestPermission();if(perm!=='granted')throw new Error('denied');
+    await this.register();
+  },
+  async disable(){
+    if(!ui.push.on)return;ui.push.on=false;persistNow();
+    try{const reg=await navigator.serviceWorker.ready,s=await reg.pushManager.getSubscription();if(s)await s.unsubscribe()}catch{}
+    try{if(SY.on)await Sync.call({action:'push-unreg',dev:ui.dev})}catch{}
+  },
+  async refresh(){if(!ui.push.on||!SY.on||!this.supported()||Notification.permission!=='granted')return;if(ui.push.cov-Date.now()/1000>20*86400)return;try{await this.register()}catch{}}
+};
+function pushCard(){
+  const old=SY.sv&&SY.sv<8,p=ui.push.prefs,perm=typeof Notification!=='undefined'?Notification.permission:'default',on=ui.push.on&&perm==='granted';
+  const iosNo=PUSH.ios()&&!PUSH.standalone();
+  const box=(k,l)=>`<label class="chk"><input type="checkbox" data-pp="${k}"${p[k]?' checked':''}>${l}</label>`;
+  let action;
+  if(old)action='<p class="hint bad">צריך קודם לעדכן את הסקריפט בגיליון (ההוראות למעלה).</p>';
+  else if(iosNo)action='<p class="hint">באייפון התראות עובדות רק כשהאפליקציה מותקנת במסך הבית: ב־Safari, כפתור השיתוף ← "הוסף למסך הבית". אחר כך פותחים מהאייקון ומפעילים כאן.</p>';
+  else if(!PUSH.supported())action='<p class="hint">הדפדפן הזה לא תומך בהתראות. באייפון צריך iOS 16.4 ומעלה.</p>';
+  else if(perm==='denied')action='<p class="hint bad">ההתראות חסומות במכשיר. אפשר לאשר מחדש בהגדרות הטלפון ← התראות ← הכסף שלי.</p>';
+  else action=on?'<p class="okt" style="margin:4px 0 0">פעילות במכשיר הזה</p><div class="btnrow"><button class="btn sm" data-act="push-test">שלח התראת בדיקה</button><button class="btn danger sm" data-act="push-off">כבה את כל ההתראות</button></div>':'<div class="btnrow"><button class="btn solid sm" data-act="push-on">הפעל התראות במכשיר הזה</button></div>';
+  return `<div class="card" id="pushCard"><h2><svg class="ic" style="vertical-align:-4px"><use href="#i-bell"/></svg> התראות בטלפון</h2>
+<p class="hint">התראות גם כשהאפליקציה סגורה. כל אחד בוחר אצלו מה לקבל, ואפשר לשנות או לכבות כאן בכל רגע.</p>
+${box('tx','כשהשותף מוסיף הוצאה או הכנסה')}${box('msg','הודעה חדשה')}${box('budget','קטגוריה מתקרבת לתקציב או חורגת ממנו')}${box('rec','הוצאה או הכנסה קבועה נכנסה')}
+<p class="err" id="pErr"></p>${action}</div>`;
+}
+$('#syncBody').addEventListener('change',async e=>{const k=e.target.dataset&&e.target.dataset.pp;if(!k)return;ui.push.prefs[k]=e.target.checked;persistNow();
+  if(ui.push.on&&SY.on){try{const r=await Sync.call({action:'push-prefs',dev:ui.dev,prefs:ui.push.prefs});toast(r.ok?'ההעדפות נשמרו':'לא הצלחתי לשמור, נסה שוב')}catch(err){toast(errText(err))}}});
+
 /* ---------- boot ---------- */
-load();runRec(true);route();loadAvatar();resetIdle();
+load();runRec(true);route();loadAvatar();resetIdle();if(SY.on){saveSyncInfo();setTimeout(()=>PUSH.refresh(),4000)}
 if(SY.on){setSync('ok');Sync.run(true)}
 setInterval(()=>{if(SY.on&&document.visibilityState==='visible')Sync.run()},20000);
 setInterval(()=>{if(SY.on)chrome()},30000);
