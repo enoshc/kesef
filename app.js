@@ -371,8 +371,8 @@ function loadXLSX(){if(window.XLSX)return Promise.resolve();return xlsxP||(xlsxP
 
 /* ---------- chrome: drawer, router, status ---------- */
 const TITLES={home:'סקירה',tx:'תנועות',budget:'תקציב',reports:'דוחות',bank:'בנק וכרטיס',settings:'הגדרות',msgs:'הודעות',album:'תמונות ורקע',import:'ייבוא מאקסל ושיטס',sync:'סנכרון משותף',backup:'גיבוי וייצוא',profile:'פרופיל והתקנה'};
-function openDrawer(){$('#drawer').classList.add('open');$('#scrim').hidden=false;$('#menuBtn').setAttribute('aria-expanded','true');setTimeout(()=>$('#drawer .menu a.on, #drawer .menu a')?.focus(),50)}
-function closeDrawer(){$('#drawer').classList.remove('open');$('#scrim').hidden=true;$('#menuBtn').setAttribute('aria-expanded','false')}
+function openDrawer(){$('#drawer').classList.add('open');$('#scrim').hidden=false;$('#menuBtn').setAttribute('aria-expanded','true');$('#moreBtn')?.setAttribute('aria-expanded','true');setTimeout(()=>$('#drawer .menu a.on, #drawer .menu a')?.focus(),50)}
+function closeDrawer(){$('#drawer').classList.remove('open');$('#scrim').hidden=true;$('#menuBtn').setAttribute('aria-expanded','false');$('#moreBtn')?.setAttribute('aria-expanded','false')}
 function openSpeed(){$('#speed').hidden=false;$('#scrim2').hidden=false;$('#fab').setAttribute('aria-expanded','true')}
 function closeSpeed(){$('#speed').hidden=true;$('#scrim2').hidden=true;$('#fab').setAttribute('aria-expanded','false')}
 function route(){
@@ -399,21 +399,21 @@ function chrome(){
 /* ---------- render: home ---------- */
 function renderHome(){
   const cur=ui.cur,pm=shiftYm(cur,-1),inc=tot(cur,'inc'),exp=tot(cur,'exp'),net=inc-exp,pi=tot(pm,'inc');
-  const days=cur===nowYm?T0.getDate():new Date(+cur.slice(0,4),+cur.slice(5),0).getDate();
-  const sv=savedIn(cur),mn=MN[mIdx(cur)],spend=spendM(cur),pspend=spendM(pm);
+  const mn=MN[mIdx(cur)],spend=spendM(cur),pspend=spendM(pm);
   $('#big').textContent=!inc&&!exp?`עוד אין תנועות ב${mn}`:net>=0?`נשארו לך ${fmt(net)} ב${mn}`:`חרגת ב־${fmt(-net)} ב${mn}`;
   let top=null,tv=0;exps().filter(c=>!c.sav).forEach(c=>{const v=spent(cur,c.id);if(v>tv){tv=v;top=c}});
   $('#sub').textContent=inc?`הוצאת ${Math.round(spend/inc*100)}% מההכנסות${top?`, והכי הרבה הלך על ${top.name}`:''}.`:exp?`הוצאת ${fmt(exp)} ועוד לא נרשמה הכנסה החודש.`:'הוסף משכורת או הוצאה ראשונה כדי להתחיל.';
   const ch=(a,b)=>b?`${a>=b?'↑':'↓'} ${Math.abs(Math.round((a-b)/b*100))}% מהחודש הקודם`:'אין נתון לחודש הקודם';
-  const f=[['הכנסות',fmt(inc),ch(inc,pi)],['הוצאות',fmt(spend),ch(spend,pspend)],['הופרש לחיסכון',fmt(sv),inc?`${Math.round(sv/inc*100)}% מההכנסות`:'לפי קטגוריית החיסכון'],['הוצאה ממוצעת ליום',fmt(Math.max(0,spend)/days),`על פני ${days} ימים`]];
+  const f=[['הכנסות',fmt(inc),ch(inc,pi)],['הוצאות',fmt(spend),ch(spend,pspend)]];
   $('#figs').innerHTML=f.map(x=>`<div><span>${esc(x[0])}</span><b>${esc(x[1])}</b><small>${esc(x[2])}</small></div>`).join('');
   $('#noteHome').hidden=!sample;$('#hName').textContent=S.profile.name;
   renderHomeMsg();renderHomeAlbum();renderForecast();renderInbox();renderCardHome();
   renderAlerts();renderGoal();renderCats();drawChart();
-  const rec=inM(cur).sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0).slice(0,6);
+  const rec=inM(cur).sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0).slice(0,4);
   $('#recent').innerHTML=rec.length?`<div class="dayl">${rec.map(t=>txRow(t,true)).join('')}</div>`:'<p class="empty">אין תנועות בחודש הזה.</p>';
   hydrate($('#recent'));
 }
+let showAllAlerts=false;
 function renderAlerts(){
   const out=[],cur=ui.cur,inc=tot(cur,'inc'),exp=tot(cur,'exp'),ap=AP();
   if(inc&&exp>inc)out.push(['over','ההוצאות עברו את ההכנסות',`הוצאת ${fmt(exp-inc)} יותר ממה שנכנס החודש.`]);
@@ -428,8 +428,11 @@ function renderAlerts(){
     subs().filter(s=>s.isNew||s.chg>0).slice(0,3).forEach(s=>out.push(['warn',s.isNew?`מנוי חדש: ${s.n.slice(0,30)}`:`${s.n.slice(0,30)} התייקר`,s.isNew?`${fmt(s.a)} ${s.yearly?'בשנה':'בחודש'}. אם זה לא שלך, כדאי לבדוק.`:`מ־${fmt(s.prev)} ל־${fmt(s.a)}.`]));
     const ow=sumBy(owed(),o=>o.a);if(ow>0)out.push(['warn',`מגיעים לך ${fmt(ow)} מחברים`,'פירוט ב"דוחות", בכרטיס "מי חייב לי".'])}
   const list=out.length?out:[['ok','הכול בתוך התקציב','אף קטגוריה לא קרובה לחריגה החודש.']];
-  $('#alList').innerHTML=list.map(a=>`<li class="${a[0]}"><div><b>${esc(a[1])}</b><small>${esc(a[2])}</small></div></li>`).join('');
+  const view=showAllAlerts?list:list.slice(0,2);
+  const rest=list.length-view.length;
+  $('#alList').innerHTML=view.map(a=>`<li class="${a[0]}"><div><b>${esc(a[1])}</b><small>${esc(a[2])}</small></div></li>`).join('')+(rest?`<li class="more"><button type="button" class="lnk2" id="alMore" aria-expanded="false">עוד ${rest} התראות</button></li>`:'');
 }
+$('#alList').addEventListener('click',e=>{if(!e.target.closest('#alMore'))return;showAllAlerts=true;renderAlerts()});
 function renderGoal(){
   const cur=ui.cur,g=G(),sv=savedIn(cur),left=Math.max(0,tot(cur,'inc')-tot(cur,'exp')),mn=MN[mIdx(cur)];
   $('#gSaved').textContent=fmt(sv);$('#gOf').textContent=g?`מתוך יעד של ${fmt(g)} ב${mn}`:'לא הוגדר יעד';
@@ -442,10 +445,13 @@ function renderGoal(){
 function renderCats(){
   const cur=ui.cur,sal=salary(cur);
   const rows=exps().map(c=>({c,s:spent(cur,c.id),b:budgetOf(cur,c)})).filter(r=>r.s||r.b).sort((a,b)=>b.s-a.s||b.b-a.b);
+  const top=rows.slice(0,5),more=rows.length-top.length;
   const maxS=Math.max(1,...rows.map(r=>r.s));
-  $('#catHint').textContent=sal?`התקציב נגזר מחלוקת המשכורת של החודש (${fmt(sal)}). הקו השחור מסמן את התקציב.`:'עוד לא נרשמה משכורת החודש, לכן מוצגות רק ההוצאות בפועל.';
-  $('#cats').innerHTML=rows.length?rows.map(r=>{const s=Math.max(0,r.s),den=r.b?Math.max(r.b,s):maxS,over=r.b&&r.s>r.b+.5;const note=r.s<0?'הזיכויים גדולים מההוצאות':r.b?(over?`חריגה של ${fmt(r.s-r.b)}`:`נשארו ${fmt(r.b-r.s)} מתוך ${fmt(r.b)}`):r.c.sav?'חיסכון':'ללא תקציב';
-    return `<div class="cr${over?' over':''}"><span class="cn"><i style="background:${col(r.c)}"></i>${esc(r.c.name)}</span><div class="tr"><b style="width:${(s/den*100).toFixed(1)}%;background:${col(r.c)}"></b>${r.b?`<u style="inset-inline-start:calc(${(r.b/den*100).toFixed(1)}% - 1px)"></u>`:''}</div><span class="cv">${fmt(r.s)}<small>${esc(note)}</small></span></div>`}).join(''):'<p class="empty">אין הוצאות בחודש הזה.</p>';
+  $('#catHint').textContent=sal?'הקו מסמן את התקציב מתוך המשכורת.':'בלי משכורת מוצגות רק ההוצאות.';
+  const rowHtml=r=>{const s=Math.max(0,r.s),den=r.b?Math.max(r.b,s):maxS,over=r.b&&r.s>r.b+.5;const note=r.s<0?'הזיכויים גדולים מההוצאות':r.b?(over?`חריגה של ${fmt(r.s-r.b)}`:`נשארו ${fmt(r.b-r.s)} מתוך ${fmt(r.b)}`):r.c.sav?'חיסכון':'ללא תקציב';
+    return `<div class="cr${over?' over':''}"><span class="cn"><i style="background:${col(r.c)}"></i>${esc(r.c.name)}</span><div class="tr" role="img" aria-label="${esc(r.c.name)}, ${esc(fmt(r.s))}"><b style="width:${(s/den*100).toFixed(1)}%;background:${col(r.c)}"></b>${r.b?`<u style="inset-inline-start:calc(${(r.b/den*100).toFixed(1)}% - 1px)"></u>`:''}</div><span class="cv">${fmt(r.s)}<small>${esc(note)}</small></span></div>`};
+  $('#cats').innerHTML=top.length?top.map(rowHtml).join(''):'<p class="empty">אין הוצאות בחודש הזה.</p>';
+  const cm=$('#catMore');if(cm){cm.hidden=!more;cm.innerHTML=more?`<a href="#budget">ועוד ${more} בתקציב</a>`:''}
 }
 const svg=$('#chart');
 const niceStep=x=>{const p=10**Math.floor(Math.log10(x||1)),f=x/p;return (f<=1?1:f<=2?2:f<=5?5:10)*p};
@@ -1127,7 +1133,7 @@ function renderMsgs(){
 function scrollChat(){requestAnimationFrame(()=>window.scrollTo(0,document.body.scrollHeight))}
 function renderHomeMsg(){
   const c=$('#homeMsg'),list=ITEMS('msg');
-  if(!list.length&&!SY.on){c.hidden=true;return}c.hidden=false;const un=unread();
+  if(!list.length){c.hidden=true;return}c.hidden=false;const un=unread();
   c.innerHTML=`<div class="ch"><h2>הודעות${un?` <span class="cnt" style="vertical-align:3px">${un}</span>`:''}</h2><a href="#msgs" class="lnk">${list.length?'לכל ההודעות':'כתוב הודעה'}</a></div>`+
     (list.length?list.slice(-2).map(m=>`<a class="mrow" href="#msgs" style="color:inherit;text-decoration:none"><small>${esc(m.dv===ui.dev?'אני':(m.by||'שותף'))}, ${esc(dayLabel(dkey(m.ts)).split(',')[0])} ${hm(m.ts)}</small><span>${esc(m.text)}</span></a>`).join(''):'<p class="hint" style="margin:0">השאירו כאן הודעות זה לזה. הן יופיעו אצל כל מי שמחובר לחשבון.</p>');
 }
@@ -1172,9 +1178,9 @@ function stopHomeAlbum(){clearInterval(homeT);homeT=null}
 async function homeNext(){const list=ITEMS('pic');const c=$('#homeAlbum');if(!list.length||c.hidden)return;const p=list[homeI++%list.length];const u=await imgURL(p.img);if(!u)return;
   const ls=$$('.ssimg',c);if(ls.length<2)return;const a=ls[homeL],b=ls[1-homeL];homeL=1-homeL;a.style.backgroundImage=`url("${u}")`;a.classList.remove('on');void a.offsetWidth;a.classList.add('on');b.classList.remove('on');const cap=$('.cap',c);if(cap)cap.textContent=p.text||''}
 function renderHomeAlbum(){
-  const c=$('#homeAlbum'),list=ITEMS('pic');c.hidden=false;
-  if(list.length&&ui.bg.mode!=='off'){stopHomeAlbum();c.hidden=true;return}
-  if(!list.length){stopHomeAlbum();c.className='card albumcard empty';c.innerHTML=`<div class="ch"><h2>התמונות שלנו</h2><a href="#album" class="lnk">הוסף תמונות</a></div><p class="hint" style="margin:0">הוסיפו תמונות והן יתחלפו ברקע של האפליקציה, אצל כל מי שמחובר לחשבון.</p>`;return}
+  const c=$('#homeAlbum'),list=ITEMS('pic');
+  if(!list.length||ui.bg.mode!=='off'){stopHomeAlbum();c.hidden=true;return}
+  c.hidden=false;
   if(homeT&&c.dataset.n===String(list.length))return;
   c.className='card albumcard';c.dataset.n=String(list.length);
   c.innerHTML=`<div class="ssimg"></div><div class="ssimg"></div><div class="ac"><div><b>${esc(S.profile.name||'התמונות שלנו')}</b><span class="cap"></span></div><div class="btnrow" style="margin:0"><a class="btn sm" href="#album">לאלבום</a></div></div>`;
@@ -1261,11 +1267,7 @@ function renderForecast(){
   const f=forecast(),el=$('#fc'),c=$('#homeFc');
   if(!f||(!inM(nowYm).length&&!f.up.length)){el.hidden=true;c.hidden=true;return}
   el.hidden=false;el.innerHTML=`צפי לסוף החודש: ${f.net>=0?`יישארו בערך <b>${esc(fmt(f.net))}</b>`:`חריגה של בערך <b>${esc(fmt(-f.net))}</b>`}`;
-  c.hidden=false;
-  c.innerHTML=`<div class="ch"><h2>צפוי עד סוף החודש</h2><a href="#budget" class="lnk">קבועות</a></div>
-<p class="fcbig" style="color:${f.net>=0?'var(--inc)':'var(--over)'}">${f.net>=0?'יישארו':'חריגה של'} ${esc(fmt(Math.abs(f.net)))}</p>
-<p class="hint" style="margin:0 0 6px">לפי מה שכבר נכנס ויצא, הקבועות שעוד צפויות, וקצב ההוצאות היומי שלך (${esc(fmt(f.restVar))} ב־${f.left} הימים שנשארו).</p>
-${f.up.length?f.up.map(x=>{const p={t:x.r.t,c:x.r.c,a:x.r.a},k=kd(p),pos=incA(p)>0||isRef(p);return `<div class="fcrow"><span class="day">${x.d} ב${esc(MS[mIdx(nowYm)])}</span><span>${esc(x.r.n||cat(x.r.c)?.name||'')}${k==='int'?' <small class="hint">(העברה, לא נספרת)</small>':''}</span><b style="${pos?'color:var(--inc)':''}">${pos?'+':''}${esc(fmt(x.r.a))}</b></div>`}).join(''):'<p class="hint" style="margin:0">אין עוד הוצאות קבועות החודש. <a href="#budget">להוסיף קבועות</a></p>'}`;
+  c.hidden=true;
 }
 function renderRecList(){
   const l=S.rec.slice().sort((a,b)=>(b.on-a.on)||a.day-b.day);
@@ -1648,7 +1650,7 @@ function upRecInc(from,to){let s=0;S.rec.forEach(r=>{if(!r.on||r.t!=='inc')retur
 function cardForecast(){const ym=nextBillYm(),b=cardBill(ym),hasCard=TX().some(t=>acct(t)==='card');if(!hasCard&&!b.a)return null;
   const now=balAt(todayStr),inc=now?upRecInc(todayStr,b.d):0,after=now?Math.round((now.v+inc-b.a)*100)/100:null;
   return {...b,now,inc,after,low:after!==null&&after<S.ex.minBal}}
-function renderCardHome(){const el=$('#homeCard');if(!el)return;const f=ui.cur===nowYm?cardForecast():null;if(!f||(!f.a&&!f.now)){el.hidden=true;return}el.hidden=false;
+function renderCardHome(){const el=$('#homeCard');if(!el)return;const f=ui.cur===nowYm?cardForecast():null;if(!f||!f.low){el.hidden=true;return}el.hidden=false;
   el.innerHTML=`<div class="ch"><h2>החיוב הבא בכרטיס</h2><a href="#bank" class="lnk">פירוט ובדיקת יתרה</a></div>
 <p class="fcbig">${esc(fmt(f.a))} <small class="hint">ב־${esc(ddm(f.d))}</small></p>
 ${f.now?`<p class="hint" style="margin:0">${f.low?'<b class="bad">':''}בבנק אחרי החיוב: בערך ${esc(fmt(f.after))}${f.low?'</b>':''}${f.inc?`, כולל ${esc(fmt(f.inc))} הכנסות קבועות שצפויות עד אז`:''}.</p>`:'<p class="hint" style="margin:0">הזן את היתרה בבנק במסך "בנק וכרטיס" כדי לדעת אם יש מספיק כסף לחיוב.</p>'}`}

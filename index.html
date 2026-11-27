@@ -15,9 +15,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=16">
+<link rel="stylesheet" href="app.css?v=17">
 </head>
 <body>
+<a class="skip" href="#main">דילוג לתוכן</a>
 <div class="bgfx" id="bgfx" aria-hidden="true"><div class="bgl"></div><div class="bgl"></div><div class="bgveil"></div></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
@@ -60,26 +61,27 @@
     <div class="who"><b id="hhName">הכסף שלי</b><small id="dSync">שמור במכשיר הזה</small></div>
     <button class="icon dclose" id="dClose" aria-label="סגירת התפריט"><svg class="ic"><use href="#i-x"/></svg></button>
   </div>
-  <nav class="menu">
-    <a href="#home" data-nav="home"><svg class="ic"><use href="#i-home"/></svg>סקירה</a>
-    <a href="#tx" data-nav="tx"><svg class="ic"><use href="#i-list"/></svg>תנועות</a>
-    <a href="#budget" data-nav="budget"><svg class="ic"><use href="#i-pie"/></svg>תקציב</a>
-    <a href="#reports" data-nav="reports"><svg class="ic"><use href="#i-chart"/></svg>דוחות ומגמות</a>
-    <a href="#bank" data-nav="bank"><svg class="ic"><use href="#i-wallet"/></svg>בנק וכרטיס</a>
-    <a href="#msgs" data-nav="msgs"><svg class="ic"><use href="#i-chat"/></svg>הודעות<span class="cnt" data-unread hidden></span></a>
-    <a href="#album" data-nav="album"><svg class="ic"><use href="#i-img"/></svg>תמונות ורקע</a>
+  <nav class="menu" aria-label="ניווט">
+    <p class="mlab" id="navDay">יום יום</p>
+    <div role="group" aria-labelledby="navDay">
+      <a href="#home" data-nav="home"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg>סקירה</a>
+      <a href="#tx" data-nav="tx"><svg class="ic" aria-hidden="true"><use href="#i-list"/></svg>תנועות</a>
+      <a href="#budget" data-nav="budget"><svg class="ic" aria-hidden="true"><use href="#i-pie"/></svg>תקציב</a>
+    </div>
+    <p class="mlab" id="navMore">כשצריך</p>
+    <div role="group" aria-labelledby="navMore">
+      <a href="#reports" data-nav="reports"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg>דוחות ומגמות</a>
+      <a href="#bank" data-nav="bank"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg>בנק וכרטיס</a>
+    </div>
     <hr>
-    <a href="#import" data-nav="import"><svg class="ic"><use href="#i-import"/></svg>ייבוא מאקסל ושיטס</a>
-    <a href="#sync" data-nav="sync"><svg class="ic"><use href="#i-sync"/></svg>סנכרון משותף<span class="mbadge" id="mSync"></span></a>
-    <a href="#backup" data-nav="backup"><svg class="ic"><use href="#i-box"/></svg>גיבוי וייצוא</a>
-    <a href="#settings" data-nav="settings"><svg class="ic"><use href="#i-gear"/></svg>הגדרות</a>
+    <a href="#settings" data-nav="settings"><svg class="ic" aria-hidden="true"><use href="#i-gear"/></svg>הגדרות<span class="mbadge" id="mSync"></span><b class="cnt" data-unread hidden></b></a>
   </nav>
-  <p class="dnote">הנתונים נשמרים במכשיר שלך. כשמפעילים סנכרון הם נשמרים גם בגיליון גוגל שלך, ולא בשום מקום אחר.</p>
+  <p class="dnote">הנתונים נשארים אצלך. סנכרון, ייבוא, גיבוי, הודעות ותמונות נמצאים בהגדרות.</p>
 </aside>
 <div class="scrim" id="scrim" hidden></div>
 <div class="scrim2" id="scrim2" hidden></div>
 
-<div class="main">
+<div class="main" id="main">
   <header class="appbar">
     <button class="icon" id="menuBtn" aria-label="פתיחת התפריט" aria-controls="drawer" aria-expanded="false"><svg class="ic"><use href="#i-menu"/></svg></button>
     <h1 id="vTitle">סקירה</h1>
@@ -122,12 +124,13 @@
         <p class="gnote" id="gNote"></p>
         <div class="ghist" id="gHist"></div>
       </div>
-      <div class="card">
-        <h2>לאן הולך הכסף</h2>
+      <div class="card span2">
+        <div class="ch"><h2>לאן הולך הכסף</h2><a href="#budget" class="lnk">תקציב</a></div>
         <p class="hint" id="catHint"></p>
         <div id="cats"></div>
+        <p class="moreline" id="catMore" hidden></p>
       </div>
-      <div class="card">
+      <div class="card" id="homeChart" hidden>
         <h2>חצי שנה אחורה</h2>
         <p class="hint">הכנסות מול הוצאות. לחיצה על חודש פותחת אותו.</p>
         <div class="legend"><span><i class="sw" style="background:var(--inc)"></i>הכנסות</span><span><i class="sw" style="background:var(--ink)"></i>הוצאות</span></div>
@@ -282,6 +285,20 @@
 
   <section class="view" data-view="settings" hidden>
     <div class="pad stack setl">
+      <div class="card">
+        <div class="ssb">
+          <h2>כלים</h2>
+          <p class="hint">דברים שצריך לפעמים, לא בכל יום.</p>
+          <nav class="setnav" aria-label="כלים">
+            <a href="#sync"><b>סנכרון משותף</b><small>גיליון, קוד הצטרפות ושותפים</small></a>
+            <a href="#import"><b>ייבוא</b><small>אקסל, גוגל שיטס או קובץ מהבנק</small></a>
+            <a href="#backup"><b>גיבוי וייצוא</b><small>שמירה לקובץ, Excel או CSV</small></a>
+            <a href="#msgs"><b>הודעות</b><small>בין מי שמחובר לחשבון</small><span class="cnt" data-unread hidden></span></a>
+            <a href="#album"><b>תמונות ורקע</b><small>אלבום, רקע ושומר מסך</small></a>
+          </nav>
+        </div>
+      </div>
+      <p class="slabel">חשבון</p>
       <details class="card ssec" id="s-prof"><summary><span><b>פרופיל</b><small>שם החשבון, השם שלך ותמונה</small></span></summary>
         <div class="ssb">
         <div class="prof">
@@ -306,6 +323,7 @@
         <p class="hint">החיסכון נספר מתוך הקטגוריה "חיסכון והשקעות". התראה קופצת כשקטגוריה מגיעה לאחוז הזה מהתקציב שלה, וכשהיא חורגת.</p>
       </div>
       </details>
+      <p class="slabel">קטגוריות</p>
       <details class="card ssec" id="s-inc"><summary><span><b>קטגוריות הכנסה</b><small>איזו הכנסה נכנסת לחלוקת המשכורת</small></span></summary>
         <div class="ssb">
         <p class="hint">הכנסה מסומנת נספרת כמשכורת שממנה נגזר התקציב.</p>
@@ -323,12 +341,14 @@
       <details class="card ssec" id="s-rules"><summary><span><b>כללי קטגוריות</b><small>איזה בית עסק הולך לאיזו קטגוריה</small></span></summary>
         <div class="ssb" id="rulesCard"></div>
       </details>
+      <p class="slabel">התראות וחיבורים</p>
       <details class="card ssec" id="s-bank"><summary><span><b>כרטיס אשראי</b><small>יום החיוב והתראה לפני מינוס</small></span></summary>
         <div class="ssb" id="setBank"></div>
       </details>
       <details class="card ssec" id="s-push"><summary><span><b>התראות בטלפון</b><small>מה להודיע ומתי</small></span></summary><div class="ssb" data-sdyn="push"></div></details>
       <details class="card ssec" id="s-mail"><summary><span><b>סיכום במייל</b><small>חודשי או שבועי</small></span></summary><div class="ssb" data-sdyn="mail"></div></details>
       <details class="card ssec" id="s-auto"><summary><span><b>חיובים נכנסים לבד</b><small>הודעות מהבנק ומהאשראי</small></span></summary><div class="ssb" data-sdyn="auto"></div></details>
+      <p class="slabel">המכשיר</p>
       <details class="card ssec" id="s-siri"><summary><span><b>הוספה בקול עם סירי</b><small>"היי סירי, הוסף הוצאה"</small></span></summary><div class="ssb" data-sdyn="siri"></div></details>
       <details class="card ssec" id="s-widget"><summary><span><b>וידג׳ט למסך הבית</b><small>"נשארו לך" על מסך הבית</small></span></summary><div class="ssb" data-sdyn="widget"></div></details>
       <details class="card ssec" id="s-lock"><summary><span><b>נעילה</b><small>Face ID או קוד</small></span></summary><div class="ssb" id="lockCard"></div></details>
@@ -342,6 +362,7 @@
         <p class="hint">פותחים תמיד מהאייקון. האפליקציה עובדת גם בלי אינטרנט, והנתונים לא נמחקים.</p>
       </div>
       </details>
+      <p class="slabel">מתקדם</p>
       <details class="card ssec" id="s-reset"><summary><span><b>איפוס</b><small>מחיקת תנועות או כל הנתונים</small></span></summary>
         <div class="ssb">
         <p class="hint">מחיקת כל התנועות והחזרת הקטגוריות לברירת המחדל. אם הסנכרון פעיל, זה מוחק גם מהגיליון המשותף.</p>
@@ -354,11 +375,11 @@
 </div>
 
 <nav class="tabbar" aria-label="ניווט ראשי">
-  <a href="#home" data-nav="home"><svg class="ic"><use href="#i-home"/></svg><span>סקירה</span></a>
-  <a href="#tx" data-nav="tx"><svg class="ic"><use href="#i-list"/></svg><span>תנועות</span></a>
+  <a href="#home" data-nav="home"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg><span>סקירה</span></a>
+  <a href="#tx" data-nav="tx"><svg class="ic" aria-hidden="true"><use href="#i-list"/></svg><span>תנועות</span></a>
   <span aria-hidden="true"></span>
-  <a href="#msgs" data-nav="msgs" class="tmsg"><svg class="ic"><use href="#i-chat"/></svg><span>הודעות</span><b class="cnt" data-unread hidden></b></a>
-  <button id="moreBtn" aria-label="תפריט נוסף"><svg class="ic"><use href="#i-menu"/></svg><span>עוד</span></button>
+  <a href="#budget" data-nav="budget"><svg class="ic" aria-hidden="true"><use href="#i-pie"/></svg><span>תקציב</span></a>
+  <button id="moreBtn" class="tmsg" aria-label="תפריט נוסף" aria-controls="drawer" aria-expanded="false"><svg class="ic" aria-hidden="true"><use href="#i-menu"/></svg><span>עוד</span><b class="cnt" data-unread hidden></b></button>
 </nav>
 <button class="fab" id="fab" aria-label="הוספה" aria-expanded="false" aria-controls="speed"><svg class="ic"><use href="#i-plus"/></svg></button>
 <div class="speed" id="speed" hidden>
@@ -495,6 +516,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=26"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>

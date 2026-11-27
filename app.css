@@ -569,7 +569,7 @@ h2{font-size:18px;letter-spacing:-.02em}
 .figs span{font-size:13px;font-weight:700;letter-spacing:.01em}
 .figs b{font-size:clamp(18px,4.5vw,26px);letter-spacing:-.02em}
 .figs small{margin-top:2px;font-size:12px;line-height:1.35;color:color-mix(in srgb,var(--bink) 86%,transparent)}
-@media(min-width:900px){.figs{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:900px){.figs{grid-template-columns:repeat(2,minmax(0,1fr));max-width:720px}}
 .hero .btn:not(.pri){
   background:color-mix(in srgb,var(--bink) 12%,transparent);
   border-color:color-mix(in srgb,var(--bink) 45%,transparent);
@@ -640,4 +640,26 @@ h2{font-size:18px;letter-spacing:-.02em}
 .lock{background:
   radial-gradient(80% 50% at 50% 0%, color-mix(in srgb,var(--band) 35%,transparent), transparent 70%),
   var(--page)}
+
+/* ---------- v17: quieter home, tools live in settings ---------- */
+.skip{position:absolute;inset-inline-start:12px;top:calc(8px + env(safe-area-inset-top,0px));z-index:80;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:700;text-decoration:none;transform:translateY(-160%)}
+.skip:focus{transform:none}
+.mlab,.slabel{margin:12px 14px 2px;font:700 12px Assistant,sans-serif;color:var(--mute);letter-spacing:.06em}
+.slabel{margin:4px 8px 0}
+.setnav{display:grid;margin-top:4px}
+.setnav a{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:center;min-height:58px;padding:8px 2px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none}
+.setnav a:last-child{border-bottom:0}
+.setnav a:hover,.setnav a:focus-visible{background:var(--mist)}
+.setnav b{font:700 16px Rubik,sans-serif}
+.setnav small{color:var(--mute);font-weight:500;font-size:14px}
+.setnav .cnt{margin:0}
+.al li.more{grid-template-columns:minmax(0,1fr);padding-top:4px}
+.al li.more::before{content:none}
+.moreline{margin:10px 0 0}
+.moreline a{font-weight:700;color:var(--inc);text-decoration:none}
+@media(max-width:759px){.hero .acts{display:none}}
+@media (prefers-contrast: more){
+  .card,.btn,.field,.menu a.on{outline:2px solid var(--ink)}
+}
+
 
