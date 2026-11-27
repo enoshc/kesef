@@ -291,19 +291,21 @@ async function connectNew(url){
   url=url.trim();if(!validUrl(url))throw new Error('url');
   const key=rid(24);const res=await Sync.call({action:'pair'},url,key);
   if(!res||!res.ok)throw new Error(res&&res.err||'server');
-  startSync(url,key,true,res.sheet,res.v);
+  await startSync(url,key,true,res.sheet,res.v);
 }
 async function connectJoin(code,merge){
   const o=dec(code);if(!o)throw new Error('code');
   const res=await Sync.call({action:'ping'},o.u,o.k);
   if(!res||!res.ok)throw new Error(res&&res.err||'server');
-  startSync(o.u,o.k,merge,res.sheet,res.v);
+  await startSync(o.u,o.k,merge,res.sheet,res.v);
 }
-function startSync(url,key,merge,sheet,v){
+async function startSync(url,key,merge,sheet,v){
   if(sample){S=blank();sample=false}
   SY={on:true,url,key,since:0,dirty:[],idirty:[],cfgDirty:false,last:0,err:'',sheet:sheet||'',sv:+v||2};
   if(merge){S.tx=S.tx.filter(t=>!t.del);S.tx.forEach(t=>{t.u=t.u||Date.now();SY.dirty.push(t.id)});S.items=S.items.filter(t=>!t.del);S.items.forEach(t=>{t.u=t.u||Date.now();SY.idirty.push(t.id)});S.su=Date.now();SY.cfgDirty=true}
   else{S.tx=[];S.items=[];S.su=0}
+  if(merge){const used=[...new Set(TX().map(t=>t.img).concat(ITEMS('pic').map(p=>p.img)).filter(Boolean))];
+    for(const k of used){try{const x=await IDB.get('i:'+k);if(x&&x.up){x.up=false;await IDB.put('i:'+k,x)}}catch{}}}
   hist=[];persistNow();render();Sync.run(true);
 }
 
@@ -491,7 +493,7 @@ ${SY.sv&&SY.sv<3?`<div class="card"><h2>עדכון הסקריפט בגיליון
 <div class="card"><h2>הוספת שותף</h2><p class="hint">שלח את הקוד הזה למי שמנהל איתך את החשבון. הוא פותח את האפליקציה, נכנס לסנכרון משותף ובוחר "הצטרפות עם קוד". מי שיש לו את הקוד יכול לראות ולשנות את הנתונים, אז שלח אותו רק למי שאתה סומך עליו.</p>
 <textarea class="field code" readonly rows="3" id="invTxt">${esc(inviteCode())}</textarea>
 <div class="btnrow"><button class="btn solid" data-act="share-code">שלח קוד הצטרפות</button><button class="btn" data-act="copy-code">העתק</button></div></div>
-<div class="card"><h2>ניתוק</h2><p class="hint">המכשיר יפסיק לסנכרן. הנתונים נשארים גם במכשיר וגם בגיליון.</p><button class="btn danger sm" data-act="disconnect">נתק את המכשיר הזה</button></div>`;
+<div class="card"><h2>ניתוק</h2><p class="hint">המכשיר יפסיק לסנכרן. הגיליון והמכשירים האחרים ממשיכים כרגיל. אם חיברת את החשבון בשביל מישהו אחר, בחר "נתק ומחק", ולא יישאר אצלך כלום מהנתונים שלהם.</p><div class="btnrow"><button class="btn sm" data-act="disconnect">נתק והשאר את הנתונים</button><button class="btn danger sm" data-act="disconnect-wipe">נתק ומחק מהמכשיר</button></div></div>`;
     return;
   }
   const last=sessionStorage.getItem('kesef-url')||'';
@@ -690,6 +692,10 @@ const ACT={
   'copy-code':()=>copyText(inviteCode(),'קוד ההצטרפות הועתק','קוד הצטרפות'),
   'share-code':async()=>{const text=`קוד הצטרפות לחשבון המשותף שלנו ב"הכסף שלי":\n${inviteCode()}\n\nפותחים את ${APP_URL} ← תפריט ← סנכרון משותף ← הצטרפות עם קוד.`;if(navigator.share){try{await navigator.share({title:'הכסף שלי, קוד הצטרפות',text});return}catch(e){if(e&&e.name==='AbortError')return}}copyText(text,'ההזמנה הועתקה, הדבק אותה בוואטסאפ','הזמנה')},
   disconnect:async()=>{if(!(await ask('לנתק את המכשיר?','המכשיר יפסיק לסנכרן. הנתונים נשארים במכשיר ובגיליון, ואפשר להצטרף שוב עם הקוד.','נתק')))return;SY={...SY,on:false,dirty:[],idirty:[],cfgDirty:false};S.tx=S.tx.filter(t=>!t.del);S.items=S.items.filter(t=>!t.del);persistNow();setSync('off');render();toast('המכשיר נותק מהגיליון')},
+  'disconnect-wipe':async()=>{if(!(await ask('לנתק ולמחוק מהמכשיר?','המכשיר יתנתק, וכל התנועות, ההודעות והתמונות יימחקו ממנו. בגיליון ואצל המחוברים האחרים לא ישתנה כלום.','נתק ומחק',true)))return;
+    const imgs=[...new Set(S.tx.map(t=>t.img).concat(S.items.map(i=>i.img)).filter(Boolean))];for(const k of imgs){try{await IDB.del('i:'+k)}catch{}}
+    SY={on:false,url:'',key:'',since:0,dirty:[],idirty:[],cfgDirty:false,last:0,err:'',sheet:'',sv:0};S=blank();sample=false;hist=[];ui.read=0;
+    URLS.forEach(u=>URL.revokeObjectURL(u));URLS.clear();persistNow();setSync('off');render();toast('המכשיר נותק והנתונים נמחקו ממנו')},
   'copy-gs':()=>{if(!GS){toast('הקוד עוד לא נטען, נסה שוב בעוד רגע');return}copyText(GS,'הקוד הועתק. הדבק אותו בעורך של Apps Script','קוד הסקריפט')},
   'show-gs':()=>{if(GS)showText('קוד הסקריפט','מעתיקים את כל הטקסט ומדביקים בעורך של Apps Script.',GS)},
   connect:async(btn)=>{const url=$('#gsUrl').value.trim(),er=$('#gsErr');er.textContent='';try{sessionStorage.setItem('kesef-url',url)}catch{}
