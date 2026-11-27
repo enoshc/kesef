@@ -283,7 +283,8 @@ function applyRemote(res,full){
   return changed;
 }
 let syncState='off';
-function setSync(st){syncState=SY.on?st:'off';chrome();if(ui.view==='sync')renderSync()}
+function setSync(st){syncState=SY.on?st:'off';chrome();if(ui.view!=='sync')return;const el=$('#syncStat');if(el&&SY.on&&renderedSv===SY.sv)el.outerHTML=syncStatusHtml();else renderSync()}
+let renderedSv=-1;
 function agoText(ms){if(!ms)return 'עוד לא';const s=Math.round((Date.now()-ms)/1000);if(s<60)return 'הרגע';const m=Math.round(s/60);if(m<60)return `לפני ${m} דק׳`;const h=Math.round(m/60);if(h<24)return `לפני ${h} שע׳`;return new Date(ms).toLocaleDateString('he-IL')}
 const enc=o=>'KSF1.'+btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 function dec(code){const s=String(code||'').replace(/\s+/g,'');const m=s.match(/KSF1\.([A-Za-z0-9_-]+)/);if(!m)return null;try{let b=m[1].replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';const o=JSON.parse(decodeURIComponent(escape(atob(b))));return o&&o.u&&o.k?o:null}catch{return null}}
@@ -496,12 +497,19 @@ function renderBudget(){
 /* ---------- render: sync ---------- */
 let GS='';
 fetch('apps-script.gs',{cache:'no-cache'}).then(r=>r.ok?r.text():'').then(t=>{GS=t}).catch(()=>{});
+function syncStatusHtml(){const pend=SY.dirty.length+SY.idirty.length+(SY.cfgDirty?1:0),bad=syncState==='err';
+  return `<div class="status${bad?' err':''}" id="syncStat"><svg class="ic"><use href="#i-${bad?'alert':'check'}"/></svg><div><b>${bad?'הסנכרון נכשל':syncState==='busy'?'מסנכרן…':'מחובר לגיליון משותף'}</b><small>${esc(bad?SY.err:`עודכן ${agoText(SY.last)}${pend?`, ${pend} שינויים מחכים`:''}`)}</small></div></div>`}
 function renderSync(){
-  const b=$('#syncBody');
+  const b=$('#syncBody'),keep={},ae=document.activeElement,aid=ae&&b.contains(ae)?ae.id:'',selS=aid&&ae.selectionStart!=null?ae.selectionStart:null,selE=aid&&ae.selectionEnd!=null?ae.selectionEnd:null;
+  ['wEm','wOn','joinCode','joinMerge','gsUrl'].forEach(id=>{const el=$('#'+id);if(el)keep[id]=el.type==='checkbox'?el.checked:el.value});
+  renderSyncInner(b);renderedSv=SY.sv;
+  Object.keys(keep).forEach(id=>{const el=$('#'+id);if(!el)return;if(el.type==='checkbox'){if(!el.disabled)el.checked=keep[id]}else el.value=keep[id]});
+  if(aid){const el=$('#'+aid);if(el){el.focus({preventScroll:true});try{if(selS!=null)el.setSelectionRange(selS,selE)}catch{}}}
+}
+function renderSyncInner(b){
   if(SY.on){
-    const pend=SY.dirty.length+(SY.cfgDirty?1:0);const bad=syncState==='err';
     b.innerHTML=`<div class="card">
-<div class="status${bad?' err':''}"><svg class="ic"><use href="#i-${bad?'alert':'check'}"/></svg><div><b>${bad?'הסנכרון נכשל':'מחובר לגיליון משותף'}</b><small>${esc(bad?SY.err:`עודכן ${agoText(SY.last)}${pend?`, ${pend} שינויים מחכים`:''}`)}</small></div></div>
+${syncStatusHtml()}
 <p class="hint">כל שינוי שאתה עושה נשלח לגיליון, והאפליקציה בודקת עדכונים מהמכשירים האחרים כל 20 שניות. אפשר גם לערוך ישירות בגיליון, והשינויים יגיעו לאפליקציה.</p>
 <div class="btnrow"><button class="btn solid" data-act="sync-now">סנכרן עכשיו</button>${SY.sheet&&/^https:\/\//.test(SY.sheet)?`<a class="btn" href="${esc(SY.sheet)}" target="_blank" rel="noopener"><svg class="ic"><use href="#i-sheet"/></svg>פתח את הגיליון</a>`:''}</div></div>
 ${SY.sv&&SY.sv<5?`<div class="card"><h2>עדכון הסקריפט בגיליון</h2><p class="hint">יש גרסה חדשה של הסקריפט, עם ${[SY.sv<3?'תמונות והודעות':'',SY.sv<4?'הערות':'','תגיות וסיכום שבועי במייל'].filter(Boolean).join(', ')}. עד שתעדכן, הן נשמרות רק במכשיר ויישלחו אחרי העדכון. מעדכנים פעם אחת, ממכשיר אחד:</p><ol class="steps"><li><div><b>פותחים את עורך הסקריפטים</b><p>בגיליון: <kbd>Extensions</kbd> ← <kbd>Apps Script</kbd>.</p></div></li><li><div><b>מחליפים את הקוד</b><p>מוחקים את כל הקוד הישן, מדביקים את החדש ושומרים.</p><button class="btn solid sm" data-act="copy-gs">העתק את הקוד החדש</button></div></li><li><div><b>מאשרים שליחת מיילים</b><p>למעלה בעורך, בתפריט שליד <kbd>Debug</kbd> בוחרים את הפונקציה <kbd>authorize</kbd> ולוחצים <kbd>Run</kbd>. מאשרים את ההרשאות כמו בפעם הראשונה.</p></div></li><li><div><b>מפרסמים גרסה חדשה</b><p><kbd>Deploy</kbd> ← <kbd>Manage deployments</kbd> ← סמל העיפרון ← ב־<kbd>Version</kbd> בוחרים <kbd>New version</kbd> ← <kbd>Deploy</kbd>. הכתובת לא משתנה ואין צורך לחבר מחדש.</p></div></li></ol><button class="btn sm" data-act="sync-now">בדוק שוב</button></div>`:''}
