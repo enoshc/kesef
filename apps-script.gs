@@ -339,6 +339,16 @@ function budOf_(c, sal, cfg) {
   if (cfg && cfg.budMode === 'fix') return Math.max(0, Math.round(+c.amt || 0));
   return sal ? sal * (+c.pct || 0) / 100 : 0;
 }
+function goalFor_(cats, sal, cfg) {
+  var c = null;
+  (cats || []).forEach(function (x) { if (!c && x.sav && !x.int) c = x; });
+  if (c) {
+    var b = budOf_(c, sal, cfg);
+    if (b > 0) return Math.round(b);
+    if (cfg && cfg.budMode !== 'fix' && (+c.pct || 0) > 0) return 0;
+  }
+  return +cfg.goal || 0;
+}
 function writeCats_(cf, cfg) {
   var cats = (cfg && cfg.cats) || [];
   cf.getRange(4, 1, Math.max(1, cf.getMaxRows() - 3), 5).clearContent();
@@ -483,7 +493,7 @@ function weeklyEmail() {
     if (s / b >= ap) alerts.push({name: c.name, s: s, b: b, r: s / b});
   });
   alerts.sort(function (a, b) { return b.r - a.r; });
-  var name = cfg.name || 'הכסף שלי', goal = +cfg.goal || 0, net = mInc - mSpend - mSav;
+  var name = cfg.name || 'הכסף שלי', goal = goalFor_(cats, sal, cfg), net = mInc - mSpend - mSav;
   var row = function (a, b, col) { return '<tr><td style="padding:6px 0;border-bottom:1px solid #e3efe8">' + a + '</td><td style="padding:6px 0;border-bottom:1px solid #e3efe8;text-align:left;font-weight:bold;' + (col ? 'color:' + col : '') + '">' + b + '</td></tr>'; };
   var html = '<div dir="rtl" style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:auto;color:#0b0b10">' +
     '<div style="background:#00a862;padding:20px 22px;border-radius:14px 14px 0 0"><div style="font-size:15px">' + h_(name) + '</div>' +
@@ -529,7 +539,7 @@ function monthlyEmail() {
   var sav = sumF(month, savA_);
   var pSpend = sumF(prev, expA_);
   var sal = sumF(month.filter(function (t) { var c = catOf(t); return c && c.sal; }), incA_);
-  var net = inc - spend - sav, goal = +cfg.goal || 0, name = cfg.name || 'הכסף שלי', mn = MONTHS_[pm];
+  var net = inc - spend - sav, goal = goalFor_(cats, sal, cfg), name = cfg.name || 'הכסף שלי', mn = MONTHS_[pm];
   var byc = {};
   month.forEach(function (t) { var v = expA_(t, catOf(t)); if (!v) return; var c = catOf(t), k = c ? c.id || c.name : (t.cn || 'שונות'); byc[k] = (byc[k] || 0) + v; });
   var rows = Object.keys(byc).filter(function (k) { return byc[k] > 0; }).sort(function (a, b) { return byc[b] - byc[a]; }).slice(0, 8).map(function (k) {
@@ -1082,5 +1092,5 @@ function summary_(w) {
   }).filter(function (r) { return r.s > 0; }).sort(function (a, b) { return (b.b ? b.s / b.b : 0) - (a.b ? a.s / a.b : 0) || b.s - a.s; }).slice(0, 4);
   var rv = data.filter(function (v) { if (!v[C.id] || !v[C.x]) return false; var x = parseX_(v[C.x]); return x.rv && !/^(כן|v|x|1|true|yes)$/i.test(String(v[C.del]).trim()); }).length;
   return {ok: true, v: VERSION, name: cfg.name || 'הכסף שלי', month: MONTHS_[+ym.slice(5) - 1] + ' ' + ym.slice(0, 4), left: Math.round(inc - spend - sav),
-    inc: Math.round(inc), spend: Math.round(spend), sav: Math.round(sav), goal: +cfg.goal || 0, cats: rows, review: rv, ts: Date.now()};
+    inc: Math.round(inc), spend: Math.round(spend), sav: Math.round(sav), goal: goalFor_(cats, sal, cfg), cats: rows, review: rv, ts: Date.now()};
 }

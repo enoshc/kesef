@@ -131,6 +131,8 @@ svg text{font:13px Assistant,sans-serif;fill:var(--mute);paint-order:stroke;stro
 .gtr b{display:block;height:100%;background:var(--inc);border-radius:9px;transition:width .4s ease}
 .gtr i{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--inc) 45%,transparent) 0 5px,transparent 5px 10px)}
 .gnote{margin:10px 0 0;font-size:15px}
+#gFlow:empty{display:none}
+#gSave{margin-top:12px}
 .ghist{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:14px 0 0}
 .ghist div{text-align:center;font-size:13px;color:var(--mute)}
 .ghist span{display:block;height:10px;border-radius:5px;background:var(--mist);border:1px solid var(--line);margin-bottom:4px}

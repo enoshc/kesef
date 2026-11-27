@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=18">
+<link rel="stylesheet" href="app.css?v=19">
 </head>
 <body>
 <a class="skip" href="#main">דילוג לתוכן</a>
@@ -121,7 +121,9 @@
         <div class="ch"><h2>יעד חיסכון</h2><a href="#settings" data-sopen="s-goal" class="lnk">שינוי היעד</a></div>
         <div class="gnum"><b id="gSaved"></b><span id="gOf"></span></div>
         <div class="gtr" id="gTr" role="img"><b id="gBar"></b><i id="gPot"></i></div>
+        <p class="gnote" id="gFlow"></p>
         <p class="gnote" id="gNote"></p>
+        <button type="button" class="btn solid sm" id="gSave" hidden>רשמתי העברה</button>
         <div class="ghist" id="gHist"></div>
       </div>
       <div class="card span2">
@@ -345,10 +347,10 @@
       <details class="card ssec" id="s-goal"><summary><span><b>יעד חיסכון והתראות</b><small>יעד חודשי ומתי להתריע על תקציב</small></span></summary>
         <div class="ssb">
         <div class="gset">
-          <label>יעד חיסכון חודשי בש״ח<input class="field" id="goalIn" type="number" min="0" step="50" inputmode="numeric"></label>
+          <label><span id="goalLbl">יעד חיסכון החודש, בש״ח</span><input class="field" id="goalIn" type="number" min="0" step="50" inputmode="numeric"></label>
           <label>להתריע מ־% מהתקציב<input class="field" id="apIn" type="number" min="50" max="100" step="5" inputmode="numeric"></label>
         </div>
-        <p class="hint">החיסכון נספר מתוך הקטגוריה "חיסכון והשקעות". התראה קופצת כשקטגוריה מגיעה לאחוז הזה מהתקציב שלה, וכשהיא חורגת.</p>
+        <p class="hint" id="goalHint">היעד הוא התקציב של קטגוריית החיסכון. התראה קופצת כשקטגוריה מגיעה לאחוז הזה מהתקציב שלה, וכשהיא חורגת.</p>
       </div>
       </details>
       <p class="slabel">קטגוריות</p>
@@ -544,6 +546,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=29"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>

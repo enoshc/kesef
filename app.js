@@ -136,6 +136,20 @@ const KINDL={exp:'הוצאה',sav:'חיסכון והשקעות',inc:'הכנסה'
 function typeLabel(t){const k=kd(t),i=t.t==='inc';return k==='int'?(i?'העברה נכנסת':'העברה יוצאת'):k==='sav'?(i?'משיכה מחיסכון':'הפקדה לחיסכון'):k==='inc'?(i?'הכנסה':'החזר הכנסה'):(i?'זיכוי':'הוצאה')}
 function ensureInt(){let c=ints()[0];if(!c){c=normCat({id:S.cats.some(x=>x.id==='t1')?rid(8):'t1',k:'exp',name:'העברות בין חשבונות',color:'#94a3b8',int:true});S.cats.push(c);S.su=Date.now();if(SY.on)SY.cfgDirty=true}return c}
 const G=()=>Math.max(0,+S.goal||0);
+const savCat=()=>S.cats.find(c=>c.sav&&!c.int)||null;
+function goalOf(ym){
+  const c=savCat();
+  if(!c)return G();
+  const b=Math.round(budgetOf(ym,c));
+  if(b>0)return b;
+  if(!budFix()&&(+c.pct||0)>0)return 0;
+  return G();
+}
+function savFlow(ym){
+  let inn=0,out=0;
+  inM(ym).forEach(t=>{if(kd(t)!=='sav')return;if(t.t==='exp')inn+=t.a;else out+=t.a});
+  return {inn,out,net:inn-out};
+}
 const AP=()=>clamp(+S.alertPct||80,50,100);
 const budFix=()=>S.budMode==='fix';
 const budgetOf=(ym,c)=>budFix()?Math.max(0,+c.amt||0):salary(ym)*(+c.pct||0)/100;
@@ -228,7 +242,7 @@ const Sync={busy:false,again:false,timer:null,upBusy:false,
       const iids=[...new Set(SY.idirty)],sentI={};
       const items=iids.map(id=>{const t=S.items.find(x=>x.id===id);if(!t)return null;sentI[id]=t.u;return {...t,del:t.del?1:0}}).filter(Boolean);
       const cfgSent=SY.cfgDirty,su=S.su;
-      const res=await this.call({action:'sync',dev:ui.dev,me:ui.me,since:full?0:SY.since,full,tx,items,cfg:cfgSent&&!SY.ro?{cats:S.cats,goal:G(),alertPct:AP(),budMode:budFix()?'fix':'pct',name:S.profile.name,rec:S.rec,rules:S.rules,weekly:S.weekly,ex:S.ex,u:S.su}:null});
+      const res=await this.call({action:'sync',dev:ui.dev,me:ui.me,since:full?0:SY.since,full,tx,items,cfg:cfgSent&&!SY.ro?{cats:S.cats,goal:Math.round(goalOf(nowYm))||G(),alertPct:AP(),budMode:budFix()?'fix':'pct',name:S.profile.name,rec:S.rec,rules:S.rules,weekly:S.weekly,ex:S.ex,u:S.su}:null});
       if(!res||!res.ok)throw new Error(res&&res.err||'server');
       SY.dirty=SY.dirty.filter(id=>{const t=S.tx.find(x=>x.id===id);return t&&t.u!==sentU[id]});
       if(cfgSent&&S.su===su)SY.cfgDirty=false;
@@ -403,9 +417,18 @@ function chrome(){
 function renderHome(){
   const cur=ui.cur,pm=shiftYm(cur,-1),inc=tot(cur,'inc'),exp=tot(cur,'exp'),net=inc-exp,pi=tot(pm,'inc');
   const mn=MN[mIdx(cur)],spend=spendM(cur),pspend=spendM(pm);
-  $('#big').textContent=!inc&&!exp?`עוד אין תנועות ב${mn}`:net>=0?`נשארו לך ${fmt(net)} ב${mn}`:`חרגת ב־${fmt(-net)} ב${mn}`;
-  let top=null,tv=0;exps().filter(c=>!c.sav).forEach(c=>{const v=spent(cur,c.id);if(v>tv){tv=v;top=c}});
-  $('#sub').textContent=inc?`הוצאת ${Math.round(spend/inc*100)}% מההכנסות${top?`, והכי הרבה הלך על ${top.name}`:''}.`:exp?`הוצאת ${fmt(exp)} ועוד לא נרשמה הכנסה החודש.`:'הוסף משכורת או הוצאה ראשונה כדי להתחיל.';
+  const g=goalOf(cur),flow=savFlow(cur),sv=flow.net,left=Math.max(0,inc-exp),miss=Math.max(0,g-sv),free=Math.max(0,left-miss);
+  if(g&&(inc||exp||sv)){
+    $('#big').textContent=sv+0.5>=g?`היעד הושלם${sv>g+0.5?`, ועוד ${fmt(sv-g)}`:''} ב${mn}`:`חסרים ${fmt(miss)} ליעד החיסכון`;
+    const bits=[];
+    if(flow.inn||flow.out)bits.push(`הופקדו ${fmt(flow.inn)}`+(flow.out?`, נמשכו ${fmt(flow.out)}`:''));
+    if(inc)bits.push(sv+0.5>=g?`נשארו ${fmt(left)} להוצאות`:`אם תעביר את החסר, נשארים ${fmt(free)} להוצאות`);
+    $('#sub').textContent=bits.length?bits.join('. ')+'.':`היעד החודש ${fmt(g)}.`;
+  }else{
+    $('#big').textContent=!inc&&!exp?`עוד אין תנועות ב${mn}`:net>=0?`נשארו לך ${fmt(net)} ב${mn}`:`חרגת ב־${fmt(-net)} ב${mn}`;
+    let top=null,tv=0;exps().filter(c=>!c.sav).forEach(c=>{const v=spent(cur,c.id);if(v>tv){tv=v;top=c}});
+    $('#sub').textContent=inc?`הוצאת ${Math.round(spend/inc*100)}% מההכנסות${top?`, והכי הרבה הלך על ${top.name}`:''}.`:exp?`הוצאת ${fmt(exp)} ועוד לא נרשמה הכנסה החודש.`:'הוסף משכורת או הוצאה ראשונה כדי להתחיל.';
+  }
   const ch=(a,b)=>b?`${a>=b?'↑':'↓'} ${Math.abs(Math.round((a-b)/b*100))}% מהחודש הקודם`:'אין נתון לחודש הקודם';
   const f=[['הכנסות',fmt(inc),ch(inc,pi)],['הוצאות',fmt(spend),ch(spend,pspend)]];
   $('#figs').innerHTML=f.map(x=>`<div><span>${esc(x[0])}</span><b>${esc(x[1])}</b><small>${esc(x[2])}</small></div>`).join('');
@@ -424,8 +447,8 @@ function renderAlerts(){
     const p=Math.round(r.s/r.b*100);
     out.push(r.s>r.b+.5?['over',`${r.c.name}: חריגה של ${fmt(r.s-r.b)}`,`הוצאת ${p}% מהתקציב (${fmt(r.s)} מתוך ${fmt(r.b)}).`]:['warn',`${r.c.name}: ניצלת ${p}% מהתקציב`,`נשארו ${fmt(r.b-r.s)} עד סוף החודש.`]);
   });
-  const g=G(),sv=savedIn(cur);
-  if(g&&sv<g&&cur===nowYm)out.push(['warn',`חסרים ${fmt(g-sv)} ליעד החיסכון`,`הפרשת ${fmt(sv)} מתוך ${fmt(g)} החודש.`]);
+  const g=goalOf(cur),sv=savFlow(cur).net;
+  if(g&&sv+0.5<g&&cur===nowYm)out.push(['warn',`חסרים ${fmt(g-sv)} ליעד החיסכון`,`הופקדו ${fmt(savFlow(cur).inn)} מתוך ${fmt(g)} החודש.`]);
   if(!salary(cur)&&inM(cur).length&&!budFix())out.push(['warn','עוד לא נרשמה משכורת החודש','בלי משכורת אין תקציב לקטגוריות, אז אין גם התראות חריגה.']);
   if(cur===nowYm){const cf=cardForecast();if(cf&&cf.low)out.unshift(['over',`צפוי חוסר בבנק ב־${ddm(cf.d)}`,`חיוב הכרטיס (${fmt(cf.a)}) ישאיר בערך ${fmt(cf.after)}. כדאי להעביר כסף לפני.`]);
     subs().filter(s=>s.isNew||s.chg>0).slice(0,3).forEach(s=>out.push(['warn',s.isNew?`מנוי חדש: ${s.n.slice(0,30)}`:`${s.n.slice(0,30)} התייקר`,s.isNew?`${fmt(s.a)} ${s.yearly?'בשנה':'בחודש'}. אם זה לא שלך, כדאי לבדוק.`:`מ־${fmt(s.prev)} ל־${fmt(s.a)}.`]));
@@ -437,14 +460,26 @@ function renderAlerts(){
 }
 $('#alList').addEventListener('click',e=>{if(!e.target.closest('#alMore'))return;showAllAlerts=true;renderAlerts()});
 function renderGoal(){
-  const cur=ui.cur,g=G(),sv=savedIn(cur),left=Math.max(0,tot(cur,'inc')-tot(cur,'exp')),mn=MN[mIdx(cur)];
+  const cur=ui.cur,g=goalOf(cur),flow=savFlow(cur),sv=flow.net,left=Math.max(0,tot(cur,'inc')-tot(cur,'exp')),mn=MN[mIdx(cur)];
   $('#gSaved').textContent=fmt(sv);$('#gOf').textContent=g?`מתוך יעד של ${fmt(g)} ב${mn}`:'לא הוגדר יעד';
-  const pct=g?Math.min(100,sv/g*100):0,miss=Math.max(0,g-sv),pot=g?Math.min(miss,left)/g*100:0;
+  const pct=g?Math.min(100,Math.max(0,sv)/g*100):0,miss=Math.max(0,g-sv),pot=g?Math.min(miss,left)/g*100:0;
   $('#gBar').style.width=pct.toFixed(1)+'%';const gp=$('#gPot');gp.style.insetInlineStart=pct.toFixed(1)+'%';gp.style.width=pot.toFixed(1)+'%';
   $('#gTr').setAttribute('aria-label',`${Math.round(pct)}% מהיעד`);
-  $('#gNote').textContent=!g?'הגדר יעד חודשי כדי לעקוב אחרי ההתקדמות.':!miss?`עמדת ביעד${sv>g?` ואף עברת אותו ב־${fmt(sv-g)}`:''}.`:left>=miss?`חסרים ${fmt(miss)}. היתרה שלך החודש (${fmt(left)}) מכסה את זה, החלק המקווקו מראה כמה תגיע אם תעביר.`:left>0?`חסרים ${fmt(miss)}. גם אם תעביר את כל היתרה (${fmt(left)}) עוד יחסרו ${fmt(miss-left)}.`:`חסרים ${fmt(miss)}, ואין כרגע יתרה פנויה החודש.`;
-  $('#gHist').innerHTML=[0,1,2,3,4,5].map(i=>{const k=shiftYm(cur,i-5),s2=savedIn(k),ok=g&&s2>=g;return `<div class="${ok?'ok':''}${k===cur?' now':''}" title="${esc(MN[mIdx(k)]+': '+fmt(s2))}"><span></span>${MS[mIdx(k)]}</div>`}).join('');
+  $('#gFlow').textContent=(flow.inn||flow.out)?`הופקדו ${fmt(flow.inn)}${flow.out?` · נמשכו ${fmt(flow.out)} · נטו ${fmt(sv)}`:''}`:'';
+  $('#gNote').textContent=!g?'היעד הוא התקציב של קטגוריית החיסכון. קבע אותו בעוגה או בהגדרות.':!miss?`עמדת ביעד${sv>g+0.5?` ואף עברת אותו ב־${fmt(sv-g)}`:''}.`:left+0.5>=miss?`חסרים ${fmt(miss)}. היתרה שלך החודש (${fmt(left)}) מכסה את זה.`:left>0?`חסרים ${fmt(miss)}. גם אם תעביר את כל היתרה (${fmt(left)}) עוד יחסרו ${fmt(miss-left)}.`:`חסרים ${fmt(miss)}, ואין כרגע יתרה פנויה החודש.`;
+  const move=Math.round(Math.min(miss,left));
+  const btn=$('#gSave');btn.hidden=!(g&&miss>0.5&&left>0.5&&cur===nowYm);if(!btn.hidden)btn.textContent=`רשמתי העברה של ${fmt(move)}`;
+  $('#gHist').innerHTML=[0,1,2,3,4,5].map(i=>{const k=shiftYm(cur,i-5),s2=savFlow(k).net,g2=goalOf(k),ok=g2&&s2+0.5>=g2;return `<div class="${ok?'ok':''}${k===cur?' now':''}" title="${esc(MN[mIdx(k)]+': '+fmt(s2)+(g2?' מתוך '+fmt(g2):''))}"><span></span>${MS[mIdx(k)]}</div>`}).join('');
 }
+$('#gSave').addEventListener('click',()=>{
+  const c=savCat();if(!c){toast('אין קטגוריית חיסכון. סמן אחת כ«חיסכון והשקעות».');return}
+  const g=goalOf(nowYm),flow=savFlow(nowYm),miss=Math.max(0,g-flow.net),left=Math.max(0,tot(nowYm,'inc')-tot(nowYm,'exp'));
+  const a=Math.round(Math.min(miss,left)*100)/100;
+  if(!(a>0)){toast('אין סכום פנוי להעברה החודש');return}
+  const id=rid();
+  change(()=>{S.tx.push({id,d:todayStr,t:'exp',a,c:c.id,n:'העברה לחיסכון',img:'',u:0})},{tx:[id]});
+  toast(`נרשמה העברה של ${fmt(a)} ל${c.name}`,true);
+});
 function renderCats(){paintPie('home')}
 let pieMode='plan',pieSel='';
 function donutD(a0,a1){
@@ -565,8 +600,20 @@ function renderTx(){
 /* ---------- render: budget ---------- */
 function renderBudget(){
   renderRecList();
-  const gi=$('#goalIn'),ai=$('#apIn');if(document.activeElement!==gi)gi.value=G();if(document.activeElement!==ai)ai.value=AP();
-  const fix=budFix(),sal=salary(ui.cur);let sum=0,sumA=0;
+  const gi=$('#goalIn'),ai=$('#apIn'),sc=savCat(),sal=salary(ui.cur);
+  if(document.activeElement!==gi)gi.value=budFix()?(sc?Math.round(+sc.amt||0):G()):(goalOf(ui.cur)||G());
+  if(document.activeElement!==ai)ai.value=AP();
+  $('#goalLbl').textContent=budFix()?'כמה מוקדש לחיסכון בחודש, בש״ח':'יעד חיסכון החודש, בש״ח';
+  const gh=$('#goalHint');
+  if(gh){
+    let h='היעד הוא התקציב של «'+(sc?sc.name:'חיסכון והשקעות')+'». ';
+    if(budFix())h+='שינוי כאן מעדכן את הסכום של הקטגוריה בעוגה. ';
+    else if(sc&&sal)h+=`זה ${+sc.pct||0}% מהמשכורת (${fmt(sal)}). שינוי הסכום מעדכן את האחוז. `;
+    else if(sc)h+='אין משכורת החודש, אז הסכום נשמר עד שתיכנס משכורת והאחוז לא משתנה. ';
+    h+='התראה קופצת כשקטגוריה מגיעה לאחוז הזה מהתקציב שלה, וכשהיא חורגת.';
+    gh.textContent=h;
+  }
+  const fix=budFix();let sum=0,sumA=0;
   setSeg($('#budMode'),fix?'fix':'pct');
   $('#thAlloc').textContent=fix?'כמה בחודש':'% מהמשכורת';
   $('#thPlan').textContent=fix?'בפועל':'תקציב';
@@ -1090,7 +1137,18 @@ $('#addRow').addEventListener('click',()=>{const c=exps()[0];if(!c)return;const 
 $('#copyTsv').addEventListener('click',()=>{const rows=[['תאריך','תיאור','קטגוריה','סוג','סכום','הערה']].concat(currentList().map(t=>[t.d,t.n||'',cat(t.c)?.name||'',typeLabel(t),t.a,t.note||'']));
   copyText(rows.map(r=>r.map(v=>String(v).replace(/[\t\n]/g,' ')).join('\t')).join('\n'),'הטבלה הועתקה. הדבק אותה באקסל או בשיטס','העתקה לאקסל')});
 
-$('#goalIn').addEventListener('change',e=>{const v=Math.max(0,Math.round(+e.target.value||0));if(v===G())return;change(()=>{S.goal=v},{cfg:true});toast(`היעד החודשי עודכן ל־${fmt(v)}`,true)});
+$('#goalIn').addEventListener('change',e=>{
+  const v=Math.max(0,Math.round(+e.target.value||0)),c=savCat(),sal=salary(nowYm)||salary(ui.cur);
+  const same=budFix()?(c?Math.round(+c.amt||0):G()):(goalOf(ui.cur)||G());
+  if(v===same)return;
+  change(()=>{
+    if(!c){S.goal=v;return}
+    if(budFix()){c.amt=v;S.goal=v}
+    else if(sal>0){c.pct=clamp(Math.round(v/sal*100),0,100);S.goal=Math.round(sal*c.pct/100)}
+    else S.goal=v;
+  },{cfg:true});
+  toast(budFix()?`לחיסכון מוקדשים ${fmt(v)} בחודש`:`היעד החודשי עודכן ל־${fmt(c&&sal?Math.round(sal*(c.pct||0)/100):v)}`,true);
+});
 $('#apIn').addEventListener('change',e=>{const v=clamp(Math.round(+e.target.value||80),50,100);if(v===AP()){e.target.value=v;return}change(()=>{S.alertPct=v},{cfg:true})});
 function setChange(e){const el=e.target,tr=el.closest('tr[data-cid]');if(!tr)return;const c=cat(tr.dataset.cid);if(!c)return;const k=el.dataset.k;
   if(k==='name'&&!el.value.trim()){el.value=c.name;return}
@@ -1098,7 +1156,7 @@ function setChange(e){const el=e.target,tr=el.closest('tr[data-cid]');if(!tr)ret
     if(!after.some(x=>x.k==='exp'&&!x.int)||!after.some(x=>x.k==='inc'&&!x.int)){toast('צריך להשאיר לפחות קטגוריית הוצאה אחת וקטגוריית הכנסה אחת');renderBudget();return}
     const n=TX().filter(t=>t.c===c.id).length;change(()=>setKind(c,v),{cfg:true});
     toast(`${c.name}: ${KINDL[v]}.${n?` ${n} התנועות שבה נספרות מעכשיו בהתאם.`:''}${v==='int'?' לא נספרת בהכנסות ובהוצאות.':''}`,true);return}
-  change(()=>{if(k==='color'){if(HEX.test(el.value))c.color=el.value}else if(k==='name')c.name=el.value.trim().slice(0,40);else if(k==='pct')c.pct=clamp(Math.round(+el.value||0),0,100);else if(k==='amt')c.amt=Math.max(0,Math.min(1e7,Math.round(+el.value||0)));else if(k==='sal')c.sal=el.checked},{cfg:true})}
+  change(()=>{if(k==='color'){if(HEX.test(el.value))c.color=el.value}else if(k==='name')c.name=el.value.trim().slice(0,40);else if(k==='pct')c.pct=clamp(Math.round(+el.value||0),0,100);else if(k==='amt')c.amt=Math.max(0,Math.min(1e7,Math.round(+el.value||0)));else if(k==='sal')c.sal=el.checked;if(c.sav&&(k==='pct'||k==='amt')){const g=goalOf(nowYm);if(g>0)S.goal=g}},{cfg:true})}
 function setClick(e){if(!e.target.closest('[data-cdel]'))return;const c=cat(e.target.closest('tr').dataset.cid);if(!c)return;
   const moved=TX().filter(t=>t.c===c.id).map(t=>t.id);
   const same=S.cats.filter(x=>x.id!==c.id&&(c.int?x.int:(x.k===c.k&&!x.int)));
@@ -1111,7 +1169,7 @@ function setClick(e){if(!e.target.closest('[data-cdel]'))return;const c=cat(e.ta
 function addCat(k){const id=rid(8);change(()=>S.cats.push({id,k:k==='inc'?'inc':'exp',name:k==='exp'?'קטגוריה חדשה':k==='inc'?'הכנסה חדשה':'חשבון נוסף',color:k==='int'?'#94a3b8':PAL[S.cats.length%PAL.length],pct:0,amt:0,sal:false,sav:false,int:k==='int'}),{cfg:true});$(`tr[data-cid="${id}"] input[data-k=name]`)?.select()}
 $('#addE').addEventListener('click',()=>addCat('exp'));$('#addI').addEventListener('click',()=>addCat('inc'));$('#addT').addEventListener('click',()=>addCat('int'));
 $('#budMode').addEventListener('click',e=>{const v=e.target.closest('button')?.dataset.v;if(!v||(v==='fix')===budFix())return;const seed=v==='fix'&&!exps().some(c=>+c.amt>0),sal=salary(ui.cur)||salary(shiftYm(ui.cur,-1));
-  change(()=>{S.budMode=v==='fix'?'fix':'pct';if(seed){const list=exps(),pctSum=list.reduce((s,c)=>s+(+c.pct||0),0);let used=0;list.forEach((c,i)=>{if(i===list.length-1&&Math.round(pctSum)===100)c.amt=Math.max(0,Math.round(sal)-used);else{c.amt=Math.max(0,Math.round(sal*(+c.pct||0)/100));used+=c.amt}})}},{cfg:true});
+  change(()=>{S.budMode=v==='fix'?'fix':'pct';if(seed){const list=exps(),pctSum=list.reduce((s,c)=>s+(+c.pct||0),0);let used=0;list.forEach((c,i)=>{if(i===list.length-1&&Math.round(pctSum)===100)c.amt=Math.max(0,Math.round(sal)-used);else{c.amt=Math.max(0,Math.round(sal*(+c.pct||0)/100));used+=c.amt}})};const g=goalOf(nowYm);if(g>0)S.goal=g},{cfg:true});
   toast(v==='fix'?(seed&&sal?'הסכומים התחילו מהחלוקה של המשכורת. אפשר לשנות כל שורה.':'עכשיו אתה קובע כמה שקלים לכל קטגוריה.'):'התקציב חזר להיות אחוז מהמשכורת.',true)});
 
 /* import events */
