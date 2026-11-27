@@ -136,14 +136,20 @@ svg text{font:13px Assistant,sans-serif;fill:var(--mute);paint-order:stroke;stro
 
 .biz summary{display:flex;justify-content:space-between;gap:12px;align-items:baseline;cursor:pointer}
 .biz summary small{color:var(--mute);font-weight:400}
-.paper{background:#fff;color:#1a1a1a;border:1px solid #ddd;border-radius:16px;padding:22px 20px;margin-bottom:14px}
-.paper h2{color:#1a1a1a;margin:0 0 4px}
-.paper p{margin:2px 0}
-.paper .kicker{font:700 13px Rubik,sans-serif;letter-spacing:.12em}
-.paper .num{margin-top:12px;font-weight:700}
-.paper .sum{font:700 28px Rubik,sans-serif;margin:14px 0}
-.paper hr{border:0;border-top:1px solid #ddd;margin:12px 0}
-.paper .fine{color:#555;font-size:13px}
+.paper{background:#fff;color:#1a1a1a;border:1px solid #ddd;border-radius:16px;padding:22px 18px;margin-bottom:14px;font-size:14px}
+.paper b{font-weight:700}
+.paper .ph{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.paper .num{font-weight:700}
+.paper .pto{border:1px solid #e4e4e4;border-radius:10px;padding:10px 12px;margin:14px 0}
+.paper table{width:100%;border-collapse:collapse;margin:8px 0 14px}
+.paper th,.paper td{border-bottom:1px solid #ececec;padding:8px 6px;text-align:start}
+.paper th{font-size:13px;color:#555;font-weight:600}
+.paper td:not(:first-child),.paper th:not(:first-child){text-align:end;white-space:nowrap}
+.paper .ppay{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:8px}
+.paper .sum{font:700 22px Rubik,sans-serif;margin:14px 0 8px}
+.paper .psign{margin-top:22px}
+.paper .psign span{display:inline-block;width:140px;border-bottom:1px solid #222;vertical-align:middle}
+.paper .fine{color:#555;font-size:12px;margin:14px 0 0}
 @media print{
   body>*{display:none!important}
   #dDoc{display:block!important;position:static!important;inset:auto;width:auto;max-width:none;max-height:none;border:0;box-shadow:none;background:#fff;padding:0}
