@@ -360,3 +360,19 @@ body[data-view=msgs] .fab,body[data-view=msgs] .speed{display:none}
 #ssLine{font-size:16px;opacity:.85;margin-top:2px}
 body[data-view=msgs] .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 @media(min-width:760px){body[data-view=msgs] .toast{bottom:96px}}
+
+/* photos in the background */
+.bgl{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.6s ease}
+.bgl.on{opacity:1;animation:kb 30s linear forwards}
+.bgfx{position:fixed;inset:0;z-index:-1;display:none}
+body.bg-app .bgfx{display:block}
+.bgveil{position:absolute;inset:0;background:color-mix(in srgb,var(--page) 58%,transparent)}
+.hero{position:relative;overflow:hidden;isolation:isolate}
+.herobg{position:absolute;inset:0;z-index:-1;display:none}
+.hero.photo{--bink:#ffffff;--band:#0b3d26;background:#0b3d26;text-shadow:0 1px 10px rgba(0,0,0,.35)}
+.hero.photo .herobg{display:block}
+.hero.photo .herobg::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(4,30,18,.88),rgba(4,30,18,.45) 55%,rgba(4,30,18,.3))}
+body.bg-app .hero.photo{background:linear-gradient(to top,rgba(4,30,18,.86),rgba(4,30,18,.38))}
+body.bg-app .hero.photo .herobg{display:none}
+.hero.photo .btn{text-shadow:none}
+details.card summary{cursor:pointer;list-style-position:inside}

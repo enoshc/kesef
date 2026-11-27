@@ -73,18 +73,18 @@ const LS='kesef-li-v1',LSY='kesef-sync-v1',LSU='kesef-ui-v1';
 let S=blank(),sample=false,hist=[];
 let SY={on:false,url:'',key:'',since:0,dirty:[],idirty:[],cfgDirty:false,last:0,err:'',sheet:'',sv:0};
 const wide=matchMedia('(min-width:900px)').matches;
-const ui={view:'home',cur:nowYm,scope:'month',typeF:'all',catF:'',q:'',sortK:'d',sortD:-1,mode:wide?'grid':'list',me:'',dev:'',read:0,ss:{int:8,idle:0,info:true}};
+const ui={view:'home',cur:nowYm,scope:'month',typeF:'all',catF:'',q:'',sortK:'d',sortD:-1,mode:wide?'grid':'list',me:'',dev:'',read:0,ss:{int:8,idle:0,info:true},bg:{mode:'hero',int:10}};
 function load(){
   let raw=null;try{raw=localStorage.getItem(LS)}catch{}
   if(raw){try{S=norm(JSON.parse(raw));sample=false}catch{S=norm(sampleData());sample=true}}else{S=norm(sampleData());sample=true}
   try{const y=JSON.parse(localStorage.getItem(LSY)||'null');if(y&&typeof y==='object')SY={...SY,...y,dirty:Array.isArray(y.dirty)?y.dirty:[],idirty:Array.isArray(y.idirty)?y.idirty:[]}}catch{}
-  try{const u=JSON.parse(localStorage.getItem(LSU)||'null');if(u){if(u.mode==='list'||u.mode==='grid')ui.mode=u.mode;ui.me=String(u.me||'').slice(0,40);ui.dev=String(u.dev||'');ui.read=+u.read||0;if(u.ss)ui.ss={int:clamp(+u.ss.int||8,3,120),idle:clamp(+u.ss.idle||0,0,60),info:u.ss.info!==false}}}catch{}
+  try{const u=JSON.parse(localStorage.getItem(LSU)||'null');if(u){if(u.mode==='list'||u.mode==='grid')ui.mode=u.mode;ui.me=String(u.me||'').slice(0,40);ui.dev=String(u.dev||'');ui.read=+u.read||0;if(u.ss)ui.ss={int:clamp(+u.ss.int||8,3,120),idle:clamp(+u.ss.idle||0,0,60),info:u.ss.info!==false};if(u.bg)ui.bg={mode:['hero','app','off'].includes(u.bg.mode)?u.bg.mode:'hero',int:clamp(+u.bg.int||10,3,300)}}}catch{}
   if(!/^[a-z0-9]{8,}$/.test(ui.dev))ui.dev=rid(10);
 }
 let saveT=null,storageOk=true;
 function persist(){clearTimeout(saveT);saveT=setTimeout(persistNow,150)}
 function persistNow(){
-  try{if(!sample)localStorage.setItem(LS,JSON.stringify(S));localStorage.setItem(LSY,JSON.stringify(SY));localStorage.setItem(LSU,JSON.stringify({mode:ui.mode,me:ui.me,dev:ui.dev,read:ui.read,ss:ui.ss}));storageOk=true}
+  try{if(!sample)localStorage.setItem(LS,JSON.stringify(S));localStorage.setItem(LSY,JSON.stringify(SY));localStorage.setItem(LSU,JSON.stringify({mode:ui.mode,me:ui.me,dev:ui.dev,read:ui.read,ss:ui.ss,bg:ui.bg}));storageOk=true}
   catch{storageOk=false}
   chrome();
 }
@@ -326,7 +326,7 @@ let xlsxP=null;
 function loadXLSX(){if(window.XLSX)return Promise.resolve();return xlsxP||(xlsxP=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=()=>res();s.onerror=()=>{xlsxP=null;rej(new Error('xlsx'))};document.head.appendChild(s)}))}
 
 /* ---------- chrome: drawer, router, status ---------- */
-const TITLES={home:'סקירה',tx:'תנועות',budget:'תקציב ויעד',msgs:'הודעות',album:'תמונות ושומר מסך',import:'ייבוא מאקסל ושיטס',sync:'סנכרון משותף',backup:'גיבוי וייצוא',profile:'פרופיל והתקנה'};
+const TITLES={home:'סקירה',tx:'תנועות',budget:'תקציב ויעד',msgs:'הודעות',album:'תמונות ורקע',import:'ייבוא מאקסל ושיטס',sync:'סנכרון משותף',backup:'גיבוי וייצוא',profile:'פרופיל והתקנה'};
 function openDrawer(){$('#drawer').classList.add('open');$('#scrim').hidden=false;$('#menuBtn').setAttribute('aria-expanded','true');setTimeout(()=>$('#drawer .menu a.on, #drawer .menu a')?.focus(),50)}
 function closeDrawer(){$('#drawer').classList.remove('open');$('#scrim').hidden=true;$('#menuBtn').setAttribute('aria-expanded','false')}
 function openSpeed(){$('#speed').hidden=false;$('#scrim2').hidden=false;$('#fab').setAttribute('aria-expanded','true')}
@@ -614,6 +614,7 @@ function render(){
   chrome();
   if(ui.view==='home')renderHome();else if(ui.view==='tx')renderTx();else if(ui.view==='budget')renderBudget();else if(ui.view==='sync')renderSync();else if(ui.view==='import')renderImport();else if(ui.view==='msgs')renderMsgs();else if(ui.view==='album')renderAlbum();else if(ui.view==='profile'){$('#pName').value=S.profile.name;$('#pMe').value=ui.me}
   if(ui.view!=='home')stopHomeAlbum();
+  BG.apply();
 }
 
 /* ---------- transaction sheet ---------- */
@@ -850,7 +851,7 @@ function renderAlbum(){
   $('#albCount').textContent=list.length?`${list.length} תמונות`:'';
   $('#agrid').innerHTML=list.length?list.map(p=>`<button class="aitem" data-pic="${esc(p.id)}" aria-label="${esc(p.text||'תמונה')}"><img data-img="${esc(p.img)}" alt="">${p.text?`<small>${esc(p.text)}</small>`:''}</button>`).join(''):'<p class="hint" style="grid-column:1/-1;margin:0">עוד אין תמונות. הוסיפו תמונות של הבית, של הזוג או של מה שאתם חוסכים בשבילו.</p>';
   hydrate($('#agrid'));
-  $('#ssInt').value=String(ui.ss.int);$('#ssIdle').value=String(ui.ss.idle);$('#ssInfo').checked=ui.ss.info;
+  $('#bgMode').value=ui.bg.mode;$('#bgInt').value=String(ui.bg.int);$('#ssInt').value=String(ui.ss.int);$('#ssIdle').value=String(ui.ss.idle);$('#ssInfo').checked=ui.ss.info;
 }
 $('#albAdd').addEventListener('click',()=>$('#albFile').click());
 $('#albFile').addEventListener('change',async e=>{const fs=[...e.target.files];e.target.value='';if(!fs.length)return;
@@ -874,12 +875,37 @@ async function homeNext(){const list=ITEMS('pic');const c=$('#homeAlbum');if(!li
   const ls=$$('.ssimg',c);if(ls.length<2)return;const a=ls[homeL],b=ls[1-homeL];homeL=1-homeL;a.style.backgroundImage=`url("${u}")`;a.classList.remove('on');void a.offsetWidth;a.classList.add('on');b.classList.remove('on');const cap=$('.cap',c);if(cap)cap.textContent=p.text||''}
 function renderHomeAlbum(){
   const c=$('#homeAlbum'),list=ITEMS('pic');c.hidden=false;
-  if(!list.length){stopHomeAlbum();c.className='card albumcard empty';c.innerHTML=`<div class="ch"><h2>התמונות שלנו</h2><a href="#album" class="lnk">הוסף תמונות</a></div><p class="hint" style="margin:0">תמונות שיתחלפו כאן וגם כשומר מסך, ויופיעו אצל כל מי שמחובר לחשבון.</p>`;return}
+  if(list.length&&ui.bg.mode!=='off'){stopHomeAlbum();c.hidden=true;return}
+  if(!list.length){stopHomeAlbum();c.className='card albumcard empty';c.innerHTML=`<div class="ch"><h2>התמונות שלנו</h2><a href="#album" class="lnk">הוסף תמונות</a></div><p class="hint" style="margin:0">הוסיפו תמונות והן יתחלפו ברקע של האפליקציה, אצל כל מי שמחובר לחשבון.</p>`;return}
   if(homeT&&c.dataset.n===String(list.length))return;
   c.className='card albumcard';c.dataset.n=String(list.length);
-  c.innerHTML=`<div class="ssimg"></div><div class="ssimg"></div><div class="ac"><div><b>${esc(S.profile.name||'התמונות שלנו')}</b><span class="cap"></span></div><div class="btnrow" style="margin:0"><a class="btn sm" href="#album">לאלבום</a><button class="btn sm" data-act="ss"><svg class="ic"><use href="#i-play"/></svg>שומר מסך</button></div></div>`;
+  c.innerHTML=`<div class="ssimg"></div><div class="ssimg"></div><div class="ac"><div><b>${esc(S.profile.name||'התמונות שלנו')}</b><span class="cap"></span></div><div class="btnrow" style="margin:0"><a class="btn sm" href="#album">לאלבום</a></div></div>`;
   stopHomeAlbum();homeI=Math.floor(Math.random()*list.length);homeNext();homeT=setInterval(homeNext,7000);
 }
+
+/* ---------- photos in the background ---------- */
+const BG={t:null,i:-1,layer:0,el:null,
+  apply(){
+    const pics=ITEMS('pic'),mode=ui.bg.mode,on=pics.length>0&&mode!=='off';
+    document.body.classList.toggle('bg-app',on&&mode==='app');
+    $('#hero').classList.toggle('photo',on);
+    const target=!on||document.visibilityState!=='visible'?null:mode==='app'?$('#bgfx'):(ui.view==='home'?$('#herobg'):null);
+    if(target===this.el&&this.t)return;
+    this.stop();this.el=target;if(!target)return;
+    if(this.i<0)this.i=Math.floor(Math.random()*pics.length);
+    this.next();this.t=setInterval(()=>this.next(),ui.bg.int*1000);
+  },
+  stop(){clearInterval(this.t);this.t=null;if(this.el)$$('.bgl',this.el).forEach(l=>{l.classList.remove('on');l.style.backgroundImage=''});this.el=null},
+  async next(){
+    const pics=ITEMS('pic'),el=this.el;if(!pics.length||!el)return;
+    const p=pics[this.i++%pics.length];const u=await imgURL(p.img);if(!u||this.el!==el)return;
+    const ls=$$('.bgl',el),a=ls[this.layer],b=ls[1-this.layer];this.layer=1-this.layer;
+    a.style.backgroundImage=`url("${u}")`;a.classList.remove('on');void a.offsetWidth;a.classList.add('on');b.classList.remove('on');
+  }
+};
+$('#bgMode').addEventListener('change',e=>{ui.bg.mode=e.target.value;persist();BG.stop();BG.apply();toast(ui.bg.mode==='off'?'התמונות לא יוצגו ברקע':ui.bg.mode==='app'?'התמונות יתחלפו ברקע של כל האפליקציה':'התמונות יתחלפו בראש המסך הראשי')});
+$('#bgInt').addEventListener('change',e=>{ui.bg.int=clamp(+e.target.value||10,3,300);persist();BG.stop();BG.apply()});
+document.addEventListener('visibilitychange',()=>BG.apply());
 
 /* ---------- screensaver ---------- */
 const SS={on:false,t:null,clk:null,i:0,list:[],lock:null,layer:0,

@@ -15,9 +15,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=4">
+<link rel="stylesheet" href="app.css?v=7">
 </head>
 <body>
+<div class="bgfx" id="bgfx" aria-hidden="true"><div class="bgl"></div><div class="bgl"></div><div class="bgveil"></div></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
@@ -54,7 +55,7 @@
     <a href="#tx" data-nav="tx"><svg class="ic"><use href="#i-list"/></svg>תנועות</a>
     <a href="#budget" data-nav="budget"><svg class="ic"><use href="#i-pie"/></svg>תקציב ויעד חיסכון</a>
     <a href="#msgs" data-nav="msgs"><svg class="ic"><use href="#i-chat"/></svg>הודעות<span class="cnt" data-unread hidden></span></a>
-    <a href="#album" data-nav="album"><svg class="ic"><use href="#i-img"/></svg>תמונות ושומר מסך</a>
+    <a href="#album" data-nav="album"><svg class="ic"><use href="#i-img"/></svg>תמונות ורקע</a>
     <hr>
     <a href="#import" data-nav="import"><svg class="ic"><use href="#i-import"/></svg>ייבוא מאקסל ושיטס</a>
     <a href="#sync" data-nav="sync"><svg class="ic"><use href="#i-sync"/></svg>סנכרון משותף<span class="mbadge" id="mSync"></span></a>
@@ -79,7 +80,7 @@
   </header>
 
   <section class="view" data-view="home">
-    <div class="hero"><div class="in">
+    <div class="hero" id="hero"><div class="herobg" id="herobg" aria-hidden="true"><div class="bgl"></div><div class="bgl"></div></div><div class="in">
       <a class="hname" id="hName" href="#profile"></a>
       <p class="big" id="big"></p>
       <p class="sub" id="sub"></p>
@@ -213,20 +214,29 @@
       <div class="note" id="albUpd" hidden></div>
       <div class="card">
         <div class="ch"><h2>התמונות שלנו</h2><span class="hint" style="margin:0" id="albCount"></span></div>
-        <p class="hint">תמונות שמתחלפות כמו שומר מסך. כשהסנכרון פעיל הן עוברות לכל מי שמחובר לחשבון.</p>
-        <div class="btnrow" style="margin:0 0 14px"><button class="btn solid" id="albAdd"><svg class="ic"><use href="#i-plus"/></svg>הוסף תמונות</button><button class="btn green" data-act="ss"><svg class="ic"><use href="#i-play"/></svg>הפעל שומר מסך</button></div>
+        <p class="hint">התמונות מתחלפות ברקע של האפליקציה. כשהסנכרון פעיל הן עוברות לכל מי שמחובר לחשבון.</p>
+        <div class="btnrow" style="margin:0 0 14px"><button class="btn solid" id="albAdd"><svg class="ic"><use href="#i-plus"/></svg>הוסף תמונות</button></div>
         <input type="file" id="albFile" accept="image/*" multiple hidden>
         <div class="agrid" id="agrid"></div>
       </div>
       <div class="card">
-        <h2>הגדרות שומר מסך</h2>
+        <h2>תמונות ברקע</h2>
+        <div class="gset">
+          <label>איפה להציג<select class="field" id="bgMode"><option value="hero">בראש המסך הראשי</option><option value="app">ברקע של כל האפליקציה</option><option value="off">לא להציג</option></select></label>
+          <label>החלפת תמונה כל<select class="field" id="bgInt"><option value="6">6 שניות</option><option value="10">10 שניות</option><option value="20">20 שניות</option><option value="60">דקה</option></select></label>
+        </div>
+        <p class="hint" style="margin:0">ההגדרה שמורה במכשיר הזה. כל אחד יכול לבחור אחרת אצלו.</p>
+      </div>
+      <details class="card">
+        <summary><h2 style="display:inline">שומר מסך</h2> <span class="hint">לא חובה</span></summary>
+        <div class="btnrow" style="margin:12px 0"><button class="btn green sm" data-act="ss"><svg class="ic"><use href="#i-play"/></svg>הפעל עכשיו</button></div>
         <div class="gset">
           <label>החלפת תמונה כל<select class="field" id="ssInt"><option value="5">5 שניות</option><option value="8">8 שניות</option><option value="15">15 שניות</option><option value="30">30 שניות</option><option value="60">דקה</option></select></label>
           <label>הפעלה אוטומטית כשלא נוגעים<select class="field" id="ssIdle"><option value="0">כבוי</option><option value="1">אחרי דקה</option><option value="2">אחרי 2 דקות</option><option value="5">אחרי 5 דקות</option></select></label>
         </div>
         <label class="chk"><input type="checkbox" id="ssInfo">להציג גם שעה ויתרה חודשית</label>
-        <p class="hint">בזמן ששומר המסך פועל המסך נשאר דלוק. ההגדרות האלה שמורות רק במכשיר הזה, כך שאפשר למשל להשאיר טאבלט על השיש עם הפעלה אוטומטית.</p>
-      </div>
+        <p class="hint">תמונות במסך מלא עם שעה, למשל לטאבלט שעומד במטבח. בזמן שהוא פועל המסך נשאר דלוק.</p>
+      </details>
     </div>
   </section>
 
@@ -370,6 +380,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
