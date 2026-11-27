@@ -10,7 +10,7 @@ var FOLDER = 'הכסף שלי - קבלות';
 var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's', 'הערה', 'תגיות'];
 var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11, note: 12, tags: 13};
 var TECH = C.s - C.id + 1;
-var VERSION = 11;
+var VERSION = 12;
 var DEVS = 'מכשירים';
 var DH = ['dev', 'name', 'endpoint', 'pub', 'prefs', 'tokens', 'queue', 'updated'];
 var KINDS = {
@@ -706,13 +706,13 @@ function smsCleanName_(s) {
 
 /** מפענח הודעת בנק/אשראי. מחזיר {skip:סיבה} או {a,cur,t,n,card,d,inst}. */
 function parseSms_(raw, today) {
-  var GREET = /^(?:היי|הי|שלום|hi|hello)\s+[^,\n:]{0,30}[,:]\s*/i;
+  var GREET = /^(?:(?:היי|הי|שלום|hi|hello)\s+[^,\n:]{0,30}[,:]\s*|(?:pepper|פפר|max|מקס)\s*[:\-]?\s+)/i;
   raw = String(raw || '').split(/\r?\n/).map(function (l) { return l.replace(GREET, ''); }).join('\n');
   var s = smsNorm_(raw);
   if (!s) return {skip: 'empty'};
   if (/(?:קוד|סיסמ[הא])\s*(?:ה?חד[\s-]?פעמי|ה?אימות|לאימות|זמני|הכניסה|לכניסה|הזדהות|לאישור)|קוד האימות|קוד אימות|verification code|one[\s-]?time|\bOTP\b|passcode/i.test(s)) return {skip: 'otp'};
   if (/לא אושרה|לא אושר|נדחתה|נדחה|סורבה|סירוב|לא בוצעה|לא בוצע|נכשלה|declined/i.test(s)) return {skip: 'declined'};
-  if (/(?:חיוב|תשלום|חויב)\s+(?:חודשי\s+)?(?:של\s+)?(?:ל?כרטיס(?:י)?\s*(?:ה)?אשראי|כרטיס(?:י)?\s+(?:מקס|max|ויזה|כאל|cal|ישראכרט|אמריקן|דיינרס|לאומי קארד))|(?:חיוב|חויב)\s+(?:מקס איט|ישראכרט|כאל|לאומי קארד|אמריקן אקספרס|דיינרס)/i.test(s) && !/עסקה|רכישה/.test(s)) return {skip: 'cardbill'};
+  if (/(?:חיוב|תשלום|חויב)\s+(?:חודשי\s+)?(?:של\s+)?(?:ל?כרטיס(?:י)?\s*(?:ה)?אשראי|כרטיס(?:י)?\s+(?:מקס|max|ויזה|כאל|cal|ישראכרט|אמריקן|דיינרס|לאומי קארד))|(?:חיוב|חויב|תשלום|ירד(?:ו)?|יצא(?:ו)?)\s+(?:ל|של\s+)?-?\s*(?:max|מקס|מקס איט|ישראכרט|isracard|כאל|cal|לאומי קארד|אמריקן אקספרס|דיינרס)(?:\s|$|[,.:])|(?:max|מקס איט|ישראכרט|כאל)\s+(?:פיננסים|כרטיסי אשראי)/i.test(s) && !/עסקה|רכישה|בכרטיס(?:ך)?\s+\d{4}/.test(s)) return {skip: 'cardbill'};
 
   var rxA = new RegExp(SMS_NUM + '\\s*' + SMS_CUR + '|' + SMS_CUR + '\\s*' + SMS_NUM, 'gi'), m, best = null;
   while ((m = rxA.exec(s))) {
@@ -729,8 +729,8 @@ function parseSms_(raw, today) {
   }
   if (!best || !(best.a > 0)) return {skip: 'noamount'};
 
-  var inc = /זיכוי|זוכה|זוכית|הופקד|הפקדת|הפקדה|העברה נכנסת|התקבלה העברה|קיבלת|החזר כספי|בוטלה|בוטל|ביטול עסקה|הועבר(?:ו)? לחשבונך|נכנס(?:ו|ה)? לחשבונך|refund|credited/i.test(s)
-    && !/משיכ|חויב|חיוב בסך|העברה יוצאת|הועבר(?:ו)? מחשבונך/.test(s);
+  var inc = /זיכוי|זוכה|זוכית|הופקד|הפקדת|הפקדה|העברה נכנסת|התקבלה העברה|קיבלת|נכנס(?:ה|ו)?\s|הועבר(?:ו|ה)? אליך|שלח(?:ה)? לך|החזר כספי|בוטלה|בוטל|ביטול עסקה|הועבר(?:ו)? לחשבונך|נכנס(?:ו|ה)? לחשבונך|refund|credited/i.test(s)
+    && !/משיכ|משכת|חויב|חיוב בסך|העברה יוצאת|העברת\s|שילמת|הועבר(?:ו)? מחשבונך/.test(s);
 
   var card = '', mc = s.match(/(?:כרטיס\S*|המסתיים|מסתיים|שמספרו|card|ending)[^\d]{0,22}(\d{4})(?!\d)/i);
   if (mc) card = mc[1];
@@ -756,7 +756,7 @@ function parseSms_(raw, today) {
         var lm = lines[li].match(/^(?:בית ה?עסק:?\s*)?(.+?)\s*[-:]?\s*(?:סכום|בסך|על סך)\s*[-:]?\s*[\d₪]/);
         if (!lm) continue;
         var cand = smsCleanName_(lm[1].replace(/^[^:]{1,20}:\s*/, ''));
-        if (cand && !/חרגת|יתר[הת]|כרטיס|חשבו|עסקה|רכישה|חיוב|זיכוי|העברה|בוצע|ביצעת|^(?:היי|שלום)/.test(cand)) return [0, cand];
+        if (cand && !/חרגת|יתר[הת]|כרטיס|חשבו|עסקה|רכישה|חיוב|זיכוי|העברה|בוצע|ביצעת|נכנס|קיבלת|העברת|שילמת|משכת|הופקד|^(?:היי|שלום)/.test(cand)) return [0, cand];
       }
       return null;
     },
@@ -770,12 +770,13 @@ function parseSms_(raw, today) {
     },
     function () { return s.match(new RegExp('(?:בבית העסק|בבית עסק|בית העסק|בית עסק|אצל|בעסק)[:\\s-]+(.+?)' + SMS_STOP)); },
     function () { return s.match(new RegExp('(?:בגין|עבור|מאת|לטובת|תיאור:?)\\s*:?\\s*([^,.;\\n\\d][^,.;\\n]{1,50}?)' + SMS_STOP)); },
-    function () { return after.match(new RegExp('^\\s*(?:ב-|ב\\s|ב(?!גין|כרטיס|חשבו|תאריך|יום|שעה)(?=[א-תA-Za-z0-9"\'])|אצל\\s|at\\s|ל-|לטובת\\s)\\s*(.+?)' + SMS_STOP, 'i')); },
+    function () { return after.match(new RegExp('^\\s*(?:ב-|ב\\s|ב(?!גין|כרטיס|חשבו|תאריך|יום|שעה)(?=[א-תA-Za-z0-9"\'])|אצל\\s|at\\s|ל-|לטובת\\s|מ-|מאת\\s|מ(?!חשבו|כרטיס)(?=[א-תA-Za-z0-9])|ל(?!חשבו|כרטיס)(?=[א-תA-Za-z0-9]))\\s*(.+?)' + SMS_STOP, 'i')); },
     function () { return s.match(new RegExp('(?:עסקה|רכישה|חיוב|תשלום)\\s+(?:ב-?|אצל\\s|ל-?)\\s*([^,.;\\n\\d][^,.;\\n]{1,40}?)\\s+(?:בסך|על סך|בסכום|ע"ס)')); },
+    function () { var all = s.match(/(?:^|\s)ב-\s*[^\s\d,.;][^,.;\n]{1,40}?(?=[,.;\n]|\s+(?:בתאריך|לפרטים)|$)/g); return all ? [0, all[all.length - 1].replace(/^\s*ב-\s*/, '')] : null; },
     function () { return s.match(/\bat\s+([A-Za-z0-9 .&'*\/-]{2,40}?)(?=\s+on\s|\s+for\s|[,;]|\.(?:\s|$)|$)/i); },
     function () {
       var pre = s.slice(0, best.i).replace(/^[^:]{1,20}:\s*/, '').replace(/\s*(?:בסך|על סך|בסכום|של|ע"ס)\s*$/, '').trim();
-      return pre && pre.length <= 40 && !/עסקה|רכישה|חיוב|חויב|כרטיס|חשבו|זיכוי|הועבר|בוצע|העברה|תשלום/.test(pre) ? [0, pre] : null;
+      return pre && pre.length <= 40 && !/עסקה|רכישה|חיוב|חויב|כרטיס|חשבו|זיכוי|הועבר|בוצע|העברה|תשלום|קיבלת|העברת|שילמת|משכת|נכנס|ירד|יצא|הופקד/.test(pre) ? [0, pre] : null;
     }
   ];
   for (var k = 0; k < pats.length && !n; k++) { mm2 = pats[k](); if (mm2) n = smsCleanName_(mm2[1]); }
