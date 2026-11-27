@@ -7,10 +7,10 @@
 var TX = 'תנועות';
 var CFG = 'הגדרות';
 var FOLDER = 'הכסף שלי - קבלות';
-var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's'];
-var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11};
-var TECH = H.length - C.id;
-var VERSION = 3;
+var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's', 'הערה'];
+var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11, note: 12};
+var TECH = C.s - C.id + 1;
+var VERSION = 4;
 var KINDS = {
   msg: {name: 'הודעות', H: ['תאריך', 'מאת', 'הודעה', 'נמחק', 'id', 'u', 's', 'data'], V: 4, D: 3,
     vis: function (it) { return [new Date(it.ts), safe_(it.by), safe_(it.text), it.del ? 'כן' : '']; }},
@@ -82,6 +82,7 @@ function setup_() {
     } catch (e) {}
     sh.hideColumns(C.id + 1, TECH);
   }
+  if (sh.getRange(1, C.note + 1).getValue() !== 'הערה') sh.getRange(1, C.note + 1).setValue('הערה').setFontWeight('bold').setBackground('#00a862').setFontColor('#0b0b10');
   var cf = ss.getSheetByName(CFG);
   if (!cf) {
     cf = ss.insertSheet(CFG);
@@ -112,7 +113,7 @@ function toRow_(t, now, imgs) {
   var img = String(t.img || '');
   return {
     vals: [date, t.t === 'inc' ? 'הכנסה' : 'הוצאה', Math.abs(+t.a || 0), safe_(t.cn), safe_(t.n), '', t.del ? 'כן' : '',
-      String(t.id), String(t.c || ''), img, +t.u || now, now],
+      String(t.id), String(t.c || ''), img, +t.u || now, now, safe_(String(t.note || '').slice(0, 500))],
     f: img && imgs[img] ? link_(imgs[img]) : ''
   };
 }
@@ -142,7 +143,7 @@ function fromRow_(v, tz) {
   return {
     id: String(v[C.id]), d: ds, t: /הכנס|inc/i.test(String(v[C.t])) ? 'inc' : 'exp',
     a: Math.abs(amt || 0), cn: String(v[C.cn] || ''), n: String(v[C.n] || ''),
-    c: String(v[C.c] || ''), img: String(v[C.img] || ''), u: +v[C.u] || 0, s: +v[C.s] || 0,
+    c: String(v[C.c] || ''), img: String(v[C.img] || ''), u: +v[C.u] || 0, s: +v[C.s] || 0, note: String(v[C.note] || ''),
     del: del === true || /^(כן|v|x|1|true|yes)$/i.test(String(del).trim())
   };
 }
@@ -157,7 +158,7 @@ function sync_(req) {
     if (!id && (data[r][C.d] !== '' || data[r][C.a] !== '')) {
       id = newId_();
       data[r][C.id] = id; data[r][C.u] = now; data[r][C.s] = now;
-      sh.getRange(r + 2, C.id + 1, 1, TECH).setValues([data[r].slice(C.id)]);
+      sh.getRange(r + 2, C.id + 1, 1, TECH).setValues([data[r].slice(C.id, C.s + 1)]);
     }
     if (id) idx[id] = r;
   }
@@ -319,7 +320,8 @@ function onEdit(e) {
     var sh = e.range.getSheet();
     if (sh.getName() !== TX) return;
     var r0 = e.range.getRow(), nr = e.range.getNumRows();
-    if (e.range.getColumn() > C.id) return;
+    var c0 = e.range.getColumn(), c1 = c0 + e.range.getNumColumns() - 1;
+    if (c0 > C.id && c1 <= C.s + 1) return;
     var start = Math.max(2, r0), cnt = r0 + nr - start;
     if (cnt <= 0) return;
     var now = Date.now();

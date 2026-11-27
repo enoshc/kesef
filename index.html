@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=7">
+<link rel="stylesheet" href="app.css?v=11">
 </head>
 <body>
 <div class="bgfx" id="bgfx" aria-hidden="true"><div class="bgl"></div><div class="bgl"></div><div class="bgveil"></div></div>
@@ -41,6 +41,7 @@
   <symbol id="i-img" viewBox="0 0 24 24"><path d="M3 5h18v14H3z"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M20 4L3 11l7 3 3 7z"/><path d="M10 14l10-10"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M5 4h14v12l-4 4H5z"/><path d="M15 20v-4h4M8 9h8M8 13h5"/></symbol>
   <symbol id="i-sheet" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 10h16M4 15h16M10 4v16"/></symbol>
 </defs></svg>
 
@@ -128,7 +129,7 @@
     <div class="pad">
       <div class="note" id="noteTx" hidden style="margin-bottom:12px"><span>אלה נתוני דוגמה. כל שינוי שתעשה בהם יישמר.</span><button class="btn sm" data-act="fresh">התחל טבלה ריקה</button></div>
       <div class="tools">
-        <input class="field" type="search" id="q" placeholder="חיפוש בתיאור, קטגוריה או סכום" aria-label="חיפוש">
+        <input class="field" type="search" id="q" placeholder="חיפוש בתיאור, הערה, קטגוריה או סכום" aria-label="חיפוש">
         <select class="field" id="catF" aria-label="סינון לפי קטגוריה"></select>
       </div>
       <div class="tools">
@@ -149,7 +150,7 @@
           <th data-s="n"><button>תיאור</button></th>
           <th data-s="c"><button>קטגוריה</button></th>
           <th data-s="a" style="text-align:end"><button>סכום</button></th>
-          <th>תמונה</th><th></th>
+          <th>הערה</th><th>תמונה</th><th></th>
         </tr></thead>
         <tbody id="tb"></tbody>
       </table></div></div>
@@ -316,6 +317,7 @@
       <label>תאריך<input class="field" id="txD" type="date"></label>
       <label>תיאור<input class="field" id="txN" maxlength="120" placeholder="למשל: סופר"></label>
     </div>
+    <label>הערה<textarea class="field" id="txO" rows="2" maxlength="500" placeholder="למשל: מתנה ליום ההולדת של אמא, לבקש החזר מהעבודה"></textarea></label>
     <div>
       <div class="lbl">קבלה או תמונה</div>
       <button type="button" class="picadd" id="txPicBtn"><svg class="ic"><use href="#i-cam"/></svg>צלם או בחר תמונה</button>
@@ -380,6 +382,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

@@ -277,7 +277,7 @@ kbd{font:600 14px Assistant,sans-serif;background:var(--mist);border:1px solid v
 
 @media(max-width:640px){
   #tbl thead,.set thead{display:none}
-  #tbl tbody tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 7.5em 48px;grid-template-areas:"n n a x" "d c c p";border-bottom:1px solid var(--line)}
+  #tbl tbody tr{display:grid;grid-template-columns:10.5em minmax(0,1fr) 6.5em 48px;grid-template-areas:"n n a x" "d c c p";border-bottom:1px solid var(--line)}
   #tbl tbody td{border:0;width:auto}
   #tbl td.dt{grid-area:d}#tbl td.nt{grid-area:n}#tbl td.ct{grid-area:c}#tbl td.amt{grid-area:a}#tbl td.x{grid-area:x}#tbl td.px{grid-area:p}
   #tbl td.dt input,#tbl td.ct select{font-size:15px;color:var(--mute)}
@@ -376,3 +376,9 @@ body.bg-app .hero.photo{background:linear-gradient(to top,rgba(4,30,18,.86),rgba
 body.bg-app .hero.photo .herobg{display:none}
 .hero.photo .btn{text-shadow:none}
 details.card summary{cursor:pointer;list-style-position:inside}
+.tnote{display:flex!important;gap:5px;align-items:center;color:var(--ink)!important;opacity:.8}
+.tnote .ic{width:14px;height:14px;color:var(--inc)}
+#tbl td.nto{min-width:10em}
+#txO{min-height:64px;resize:vertical;line-height:1.4}
+@media(max-width:640px){#tbl tbody tr{grid-template-areas:"n n a x" "d c c p" "o o o o"}#tbl td.nto{grid-area:o}#tbl td.nto input{font-size:15px}}
+@media(max-width:640px){#tbl td.dt input{padding-inline:6px}}
