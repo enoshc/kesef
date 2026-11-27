@@ -10,7 +10,7 @@ var FOLDER = 'הכסף שלי - קבלות';
 var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's', 'הערה', 'תגיות'];
 var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11, note: 12, tags: 13};
 var TECH = C.s - C.id + 1;
-var VERSION = 10;
+var VERSION = 11;
 var DEVS = 'מכשירים';
 var DH = ['dev', 'name', 'endpoint', 'pub', 'prefs', 'tokens', 'queue', 'updated'];
 var KINDS = {
@@ -706,6 +706,8 @@ function smsCleanName_(s) {
 
 /** מפענח הודעת בנק/אשראי. מחזיר {skip:סיבה} או {a,cur,t,n,card,d,inst}. */
 function parseSms_(raw, today) {
+  var GREET = /^(?:היי|הי|שלום|hi|hello)\s+[^,\n:]{0,30}[,:]\s*/i;
+  raw = String(raw || '').split(/\r?\n/).map(function (l) { return l.replace(GREET, ''); }).join('\n');
   var s = smsNorm_(raw);
   if (!s) return {skip: 'empty'};
   if (/(?:קוד|סיסמ[הא])\s*(?:ה?חד[\s-]?פעמי|ה?אימות|לאימות|זמני|הכניסה|לכניסה|הזדהות|לאישור)|קוד האימות|קוד אימות|verification code|one[\s-]?time|\bOTP\b|passcode/i.test(s)) return {skip: 'otp'};
