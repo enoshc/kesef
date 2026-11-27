@@ -519,7 +519,8 @@ ${SY.sv&&SY.sv<3?`<div class="card"><h2>עדכון הסקריפט בגיליון
 }
 
 /* ---------- import ---------- */
-const IMP={name:'',wb:null,sheet:'',aoa:[],hdr:0,map:{},opts:{auto:true,newCats:true,dedupe:true,defType:'exp'},parsed:null};
+const IMP={name:'',wb:null,sheet:'',aoa:[],hdr:0,map:{},opts:{auto:true,newCats:true,dedupe:true,defType:'exp',skipCard:false},parsed:null};
+const CARDPAY=/חיוב כרטיס|מקס איט|ישראכרט|isracard|כאל |לאומי קארד|אמריקן אקספרס|דיינרס|חיוב חודשי כרטיס/i;
 const FIELDS=[['d','תאריך'],['n','תיאור'],['a','סכום'],['out','סכום הוצאה (חובה)'],['in','סכום הכנסה (זכות)'],['t','סוג (הכנסה/הוצאה)'],['c','קטגוריה']];
 const HRX={d:/תאריך|date|^יום$/i,n:/תיאור|פירוט|בית ה?עסק|שם ה?עסק|description|desc|payee|memo|הערה|פרטים|אסמכתא.*תיאור/i,a:/סכום|amount|sum|סה"?כ|total/i,out:/חובה|debit|withdraw|הוצאה|חיוב/i,in:/זכות|credit|deposit|זיכוי|הכנסה/i,t:/^סוג$|type|^סוג תנועה/i,c:/קטגוריה|category|ענף/i};
 const RULES=[['סופר ואוכל',/שופרסל|רמי לוי|ויקטורי|יוחננוף|אושר עד|מגה|טיב טעם|חצי חינם|יינות ביתן|סופר|מכולת|קרפור|carrefour|פרש מרקט|מאפי|ירקות|קצביה/i],['תחבורה ודלק',/פז |סונול|דור אלון|דלק|yellow|רב.?קו|רכבת|אגד|gett|מונית|חניון|פנגו|pango|cellopark|סלופארק|כביש 6|נתיבי/i],['חשבונות ותקשורת',/סלקום|פרטנר|פלאפון|הוט |hot |בזק|גולן טלקום|we4g|חברת החשמל|חשמל|מקורות|תאגיד מים|ארנונה|סופרגז|אמישראגז|netflix|spotify|apple\.com|google/i],['בילויים ומסעדות',/ארומה|קפה|מקדונלד|בורגר|פיצה|וולט|wolt|תן ביס|10bis|מסעד|סינמה|קולנוע|גלידה|שווארמה|פלאפל|בר /i],['בריאות וביטוחים',/מכבי|כללית|מאוחדת|לאומית|סופר.?פארם|בי פארם|ביטוח|הראל|מגדל|הפניקס|מנורה|רופא|מרפאה/i],['מגורים ושכירות',/שכירות|שכר דירה|ועד בית|משכנתא/i],['חיסכון והשקעות',/חיסכון|השקע|גמל|קרן השתלמות|פיקדון|פקדון/i],['ציוד ועבודה',/ksp|באג |איבורי|ivory|מחסני חשמל|צילום|canon|קנון|amazon|אמזון|aliexpress|עלי אקספרס/i]];
@@ -554,23 +555,24 @@ async function readFile(f){
     const buf=await f.arrayBuffer();let wb;
     if(/\.(csv|tsv|txt)$/i.test(f.name)||/csv|text/.test(f.type)){let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch{text=new TextDecoder('windows-1255').decode(buf)}text=text.replace(/^\ufeff/,'');wb=XLSX.read(text,{type:'string',raw:true,FS:/\.tsv$/i.test(f.name)?'\t':undefined})}
     else wb=XLSX.read(buf,{type:'array',cellDates:false});
-    IMP.wb=wb;IMP.sheet=wb.SheetNames[0];loadSheet();
+    IMP.wb=wb;const rc=n=>{const r=wb.Sheets[n]['!ref'];return r?XLSX.utils.decode_range(r).e.r:0};IMP.sheet=wb.SheetNames.reduce((b,n)=>rc(n)>rc(b)?n:b,wb.SheetNames[0]);loadSheet();
   }catch{$('#impErr').textContent='לא הצלחתי לקרוא את הקובץ. נסה לשמור אותו כ־xlsx או csv.';}
 }
 function loadSheet(){const ws=IMP.wb.Sheets[IMP.sheet];IMP.aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:'',blankrows:false});findHeader();guessMap();parseImp();renderImport();}
 function ruleCat(n,kind){for(const [name,rx] of (kind==='inc'?IRULES:RULES))if(rx.test(n)){const c=S.cats.find(x=>x.k===kind&&x.name===name);if(c)return c.id}return ''}
 function parseImp(){
-  const m=IMP.map,rows=IMP.aoa.slice(IMP.hdr+1),out=[];let bad=0,dup=0;
+  const m=IMP.map,rows=IMP.aoa.slice(IMP.hdr+1),out=[];let bad=0,dup=0,cardN=0;
   const has=k=>m[k]!==undefined&&m[k]!=='';
   const hasNeg=has('a')&&rows.some(r=>num(r[m.a])<0);
   const seen=new Set(TX().map(t=>`${t.d}|${(+t.a).toFixed(2)}|${(t.n||'').trim()}`));
   const newCats=new Map();
   rows.forEach(r=>{
     const d=has('d')?cellDate(r[m.d]):'';let a=0,t='exp';
-    if(has('out')||has('in')){const o=has('out')?Math.abs(num(r[m.out])):0,i=has('in')?Math.abs(num(r[m.in])):0;if(o>0){a=o;t='exp'}else if(i>0){a=i;t='inc'}}
+    if(has('out')||has('in')){const o=has('out')?num(r[m.out]):0,i=has('in')?num(r[m.in]):0;if(o>0){a=o;t='exp'}else if(o<0){a=-o;t='inc'}else if(i>0){a=i;t='inc'}else if(i<0){a=-i;t='exp'}}
     else if(has('a')){const v=num(r[m.a]);a=Math.abs(v);if(has('t'))t=/הכנס|זכות|income|credit|^in$|זיכוי/i.test(String(r[m.t]))?'inc':'exp';else if(hasNeg)t=v<0?'exp':'inc';else t=IMP.opts.defType}
     const n=has('n')?String(r[m.n]??'').trim().slice(0,120):'';
     if(!d||!(a>0)){if(r.some(x=>String(x??'').trim()))bad++;return}
+    if(t==='exp'&&CARDPAY.test(n)){cardN++;if(IMP.opts.skipCard)return}
     a=Math.round(a*100)/100;
     let c='',cnNew='';
     if(has('c')){const nm=String(r[m.c]??'').trim();if(nm){const ex=S.cats.find(x=>x.name===nm&&x.k===t)||S.cats.find(x=>x.name===nm);if(ex)c=ex.id;else if(IMP.opts.newCats)cnNew=nm.slice(0,40)}}
@@ -580,7 +582,7 @@ function parseImp(){
     const isDup=IMP.opts.dedupe&&seen.has(`${d}|${a.toFixed(2)}|${n}`);if(isDup)dup++;
     out.push({d,a,t,c,n,dup:isDup});
   });
-  IMP.parsed={rows:out,bad,dup,newCats:[...newCats.values()]};
+  IMP.parsed={rows:out,bad,dup,cardN,newCats:[...newCats.values()]};
 }
 function renderImport(){
   const b=$('#impBody');if(!IMP.aoa.length){b.hidden=true;return}b.hidden=false;
@@ -595,6 +597,7 @@ function renderImport(){
 <label class="chk"><input type="checkbox" data-opt="auto"${IMP.opts.auto?' checked':''}>שיוך אוטומטי לקטגוריות לפי שם העסק (שופרסל לסופר, פז לדלק וכו׳)</label>
 <label class="chk"><input type="checkbox" data-opt="newCats"${IMP.opts.newCats?' checked':''}>ליצור קטגוריות חדשות לפי עמודת הקטגוריה בקובץ</label>
 <label class="chk"><input type="checkbox" data-opt="dedupe"${IMP.opts.dedupe?' checked':''}>לדלג על תנועות שכבר קיימות (אותו תאריך, סכום ותיאור)</label>
+${P.cardN?`<label class="chk"><input type="checkbox" data-opt="skipCard"${IMP.opts.skipCard?' checked':''}>לדלג על ${P.cardN} תשלומי כרטיס אשראי. סמן אם אתה מייבא גם את פירוט הכרטיס, אחרת אותן הוצאות ייספרו פעמיים</label>`:''}
 ${needDef?`<div class="lbl" style="margin-top:8px">כל הסכומים בקובץ חיוביים. הם:</div><div class="seg" id="impDef"><button type="button" data-v="exp" aria-pressed="${IMP.opts.defType==='exp'}">הוצאות</button><button type="button" data-v="inc" aria-pressed="${IMP.opts.defType==='inc'}">הכנסות</button></div>`:''}
 <p style="margin:14px 0 0"><b>${good.length} תנועות לייבוא</b>${P.dup?`, ${P.dup} כפולות ידולגו`:''}${P.bad?`, ${P.bad} שורות בלי תאריך או סכום לא ייקראו`:''}${P.newCats.length?`, ${P.newCats.length} קטגוריות חדשות`:''}.</p>
 <div class="sheet prev"><div class="scroll"><table><thead><tr><th>תאריך</th><th>תיאור</th><th style="text-align:end">סכום</th><th>קטגוריה</th></tr></thead><tbody>${P.rows.slice(0,12).map(r=>{const c=allCats.find(x=>x.id===r.c);return `<tr class="${r.dup?'skip':''}"><td>${esc(r.d.split('-').reverse().join('/'))}</td><td class="n">${esc(r.n)}</td><td class="num${r.t==='inc'?' okt':''}">${r.t==='inc'?'+':''}${fmt(r.a)}</td><td><i class="sw" style="background:${col(c)}"></i> ${esc(c?.name||'')}</td></tr>`}).join('')||'<tr><td colspan="4" class="empty">לא נמצאו שורות. בדוק את שורת הכותרות ואת עמודות התאריך והסכום.</td></tr>'}</tbody></table></div></div>
