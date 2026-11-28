@@ -1414,7 +1414,19 @@ function renderForecast(){
 }
 function renderRecList(){
   const l=S.rec.slice().sort((a,b)=>(b.on-a.on)||a.day-b.day);
-  $('#recList').innerHTML=l.length?l.map(r=>{const c=cat(r.c);return `<button class="recr${r.on?'':' off'}" data-rec="${esc(r.id)}"><span class="ri" style="--c:${col(c)}"><svg class="ic"><use href="#i-repeat"/></svg></span><span><b>${esc(r.n||c?.name||'')}</b><small>${esc(c?.name||'')}, כל ${r.day} בחודש${r.on?'':', מושהית'}</small></span><span class="amt2" style="${r.t==='inc'?'color:var(--inc)':''}">${r.t==='inc'?'+':''}${esc(fmt(r.a))}</span></button>`}).join(''):'<p class="hint" style="margin:0">עוד אין קבועות. אפשר להוסיף כאן, או לסמן "חוזרת כל חודש" כשמוסיפים הוצאה.</p>';
+  $('#recList').innerHTML=l.length?l.map(r=>{const c=cat(r.c);const yr=/פולו/.test(r.n)?`, ${fmt(Math.round(r.a*12))} לשנה`:'';return `<button class="recr${r.on?'':' off'}" data-rec="${esc(r.id)}"><span class="ri" style="--c:${col(c)}"><svg class="ic"><use href="#i-repeat"/></svg></span><span><b>${esc(r.n||c?.name||'')}</b><small>${esc(c?.name||'')}, כל ${r.day} בחודש${yr}${r.on?'':', מושהית'}</small></span><span class="amt2" style="${r.t==='inc'?'color:var(--inc)':''}">${r.t==='inc'?'+':''}${esc(fmt(r.a))}</span></button>`}).join(''):'<p class="hint" style="margin:0">עוד אין קבועות. אפשר להוסיף כאן, או לסמן "חוזרת כל חודש" כשמוסיפים הוצאה.</p>';
+}
+function seedPolo(){
+  if(sample||SY.ro)return;
+  try{if(localStorage.getItem('kesef-polo')==='1')return}catch{}
+  const c=S.cats.find(x=>x.k==='exp'&&!x.int&&/תחבורה/.test(x.name))||S.cats.find(x=>x.k==='exp'&&!x.int&&/ביטוח/.test(x.name));
+  if(!c)return;
+  const rows=[['ביטוח חובה, פולו 2016',Math.round(2816/12*100)/100],['ביטוח צד ג׳, פולו 2016',Math.round(3496/12*100)/100]].filter(([n])=>!S.rec.some(r=>r.n===n));
+  try{localStorage.setItem('kesef-polo','1')}catch{}
+  if(!rows.length)return;
+  const start=shiftYm(nowYm,1);
+  change(()=>{rows.forEach(([n,a])=>S.rec.push({id:rid(8),n,a,t:'exp',c:c.id,day:10,start,skip:[],on:true}))},{cfg:true,undo:false});
+  toast('נוספו ביטוחי הפולו לתקציב, מהעשירי בחודש הבא');
 }
 let recEdit=null,recType='exp';
 function recCats(sel){const l=S.cats.filter(c=>c.k===recType);$('#recC').innerHTML=l.map(c=>`<option value="${esc(c.id)}"${c.id===sel?' selected':''}>${esc(c.name)}</option>`).join('')}
@@ -2121,7 +2133,7 @@ document.addEventListener('submit',e=>{if(SY.on&&SY.ro&&!e.target.closest('#lock
 document.addEventListener('change',e=>{if(SY.on&&SY.ro&&e.target.closest('#impFile,#albFile,#bkFile,#txFile,#pFile')){e.target.value='';roStop(e)}},true);
 
 /* ---------- boot ---------- */
-load();if(LOCK.on())LOCK.show();takeJoinHash();document.body.classList.toggle('ro',!!(SY.on&&SY.ro));runRec(true);route();loadAvatar();resetIdle();if(SY.on){saveSyncInfo();setTimeout(()=>PUSH.refresh(),4000)}
+load();if(LOCK.on())LOCK.show();takeJoinHash();document.body.classList.toggle('ro',!!(SY.on&&SY.ro));seedPolo();runRec(true);route();loadAvatar();resetIdle();if(SY.on){saveSyncInfo();setTimeout(()=>PUSH.refresh(),4000)}
 if(SY.on){setSync('ok');Sync.run(true)}
 setInterval(()=>{if(SY.on&&document.visibilityState==='visible')Sync.run()},20000);
 setInterval(()=>{if(SY.on)chrome()},30000);
