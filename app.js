@@ -2057,7 +2057,13 @@ function renderSetDyn(){const keep={},ae=document.activeElement,aid=ae?.id;['wEm
   $$('[data-sdyn]').forEach(el=>{el.innerHTML=!SY.on?NOSYNC:SY.ro?'<p class="hint" style="margin:0">לא זמין בחשבון לצפייה בלבד.</p>':cardBody(F[el.dataset.sdyn]())});
   Object.keys(keep).forEach(id=>{const el=$('#'+id);if(el){if(el.type==='checkbox')el.checked=keep[id];else el.value=keep[id]}});if(aid)$('#'+aid)?.focus({preventScroll:true})}
 function renderSettings(){$('#pName').value=S.profile.name;$('#pMe').value=ui.me;renderBudget();renderSetBank();renderSetIb();renderSetBn();renderLockCard();renderSetDyn()}
-document.addEventListener('click',e=>{const a=e.target.closest('[data-sopen]');if(!a)return;const id=a.dataset.sopen;setTimeout(()=>{const d=$('#'+id);if(d){d.open=true;d.scrollIntoView({block:'start'})}},60)});
+document.addEventListener('click',e=>{
+  const sum=e.target.closest('details.ssec > summary');
+  if(!sum||e.target.closest('a,button,input,select,textarea'))return;
+  e.preventDefault();
+  const d=sum.parentElement;
+  d.open=!d.open;
+});
 
 /* ---------- app lock: Face ID / Touch ID + code, per device ---------- */
 const LOCK={k:'kesef-lock',c:null,locked:false,hid:0,
