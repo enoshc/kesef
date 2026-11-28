@@ -84,6 +84,9 @@ function normTags(a){return Array.isArray(a)?[...new Set(a.map(x=>String(x||'').
 function normRec(r){if(!r||typeof r!=='object')return null;const id=String(r.id||'').replace(/[^a-z0-9]/g,'').slice(0,8);if(id.length!==8)return null;const a=Math.round(Math.abs(+r.a||0)*100)/100;if(!(a>0))return null;return {id,n:String(r.n||'').slice(0,60),a,t:r.t==='inc'?'inc':'exp',c:String(r.c||''),day:clamp(Math.round(+r.day||1),1,31),start:/^\d{4}-\d{2}$/.test(r.start)?r.start:nowYm,skip:Array.isArray(r.skip)?r.skip.filter(x=>/^\d{4}-\d{2}$/.test(x)).slice(-60):[],on:r.on!==false}}
 function normRules(o){const r={};if(o&&typeof o==='object')Object.keys(o).slice(0,600).forEach(k=>{if(k&&k.length<=60&&typeof o[k]==='string')r[k]=o[k].slice(0,40)});return r}
 function normWeekly(w){return {emails:Array.isArray(w?.emails)?w.emails.map(String).slice(0,5):[],on:!!w?.on,freq:['week','month','both'].includes(w?.freq)?w.freq:'month',mday:clamp(Math.round(+w?.mday||11),1,28)}}
+function normIb(o){if(!o||!isFinite(+o.v))return null;const d=YMD.test(o.d)?o.d:'';const out={v:Math.round(+o.v*100)/100,ccy:String(o.ccy||'USD').slice(0,8),d,at:+o.at||0};if(isFinite(+o.pct))out.pct=Math.round(+o.pct*100)/100;return out}
+function fmtIb(ib){if(!ib)return '';const n=Math.abs(ib.v).toLocaleString('he-IL',{minimumFractionDigits:2,maximumFractionDigits:2});const c=String(ib.ccy||'').toUpperCase();if(c==='ILS'||c==='NIS')return fmt(ib.v);if(c==='USD')return (ib.v<0?'−':'')+'$'+n;return (ib.v<0?'−':'')+n+' '+c}
+function fmtPct(p){const n=Math.abs(p).toLocaleString('he-IL',{maximumFractionDigits:2});return (p>0?'+':p<0?'−':'')+n+'%'}
 function normItem(it){if(!it||(it.k!=='msg'&&it.k!=='pic'))return null;const id=String(it.id||'').replace(/[^a-z0-9]/gi,'').slice(0,40);if(!id)return null;const o={id,k:it.k,u:+it.u||0,by:String(it.by||'').slice(0,40),dv:String(it.dv||'').replace(/[^a-z0-9]/gi,'').slice(0,20),ts:+it.ts||0,text:String(it.text||'').slice(0,2000),img:String(it.img||'').replace(/[^a-z0-9]/gi,'').slice(0,40)};if(it.del)o.del=1;return o}
 function norm(d){
   const o=blank();if(!d||typeof d!=='object')return o;
@@ -111,6 +114,7 @@ function load(){
   try{const y=JSON.parse(localStorage.getItem(LSY)||'null');if(y&&typeof y==='object')SY={...SY,...y,dirty:Array.isArray(y.dirty)?y.dirty:[],idirty:Array.isArray(y.idirty)?y.idirty:[]}}catch{}
   try{const u=JSON.parse(localStorage.getItem(LSU)||'null');if(u){if(u.mode==='list'||u.mode==='grid')ui.mode=u.mode;ui.me=String(u.me||'').slice(0,40);ui.dev=String(u.dev||'');ui.read=+u.read||0;if(u.ss)ui.ss={int:clamp(+u.ss.int||8,3,120),idle:clamp(+u.ss.idle||0,0,60),info:u.ss.info!==false};if(u.push&&typeof u.push==='object')ui.push={on:!!u.push.on,cov:+u.push.cov||0,prefs:{tx:u.push.prefs?.tx!==false,msg:u.push.prefs?.msg!==false,budget:u.push.prefs?.budget!==false,rec:u.push.prefs?.rec!==false,bank:u.push.prefs?.bank!==false}};if(u.bg)ui.bg={mode:['hero','app','off'].includes(u.bg.mode)?u.bg.mode:'hero',int:clamp(+u.bg.int||10,3,300)}}}catch{}
   if(!/^[a-z0-9]{8,}$/.test(ui.dev))ui.dev=rid(10);
+  try{const ib=JSON.parse(localStorage.getItem('kesef-ib')||'null');if(ib&&isFinite(+ib.v))S.ib=normIb(ib)}catch{}
 }
 let saveT=null,storageOk=true;
 function persist(){clearTimeout(saveT);saveT=setTimeout(persistNow,150)}
@@ -314,6 +318,7 @@ function applyRemote(res,full){
     if(res.cfg.ex)S.ex=normEx(res.cfg.ex);
     S.su=+res.cfg.u;changed=true;
   }
+  if(res.ib){const ib=normIb(res.ib);if(ib&&JSON.stringify(ib)!==JSON.stringify(S.ib||null)){S.ib=ib;try{localStorage.setItem('kesef-ib',JSON.stringify(ib))}catch{}changed=true}}
   (res.tx||[]).forEach(r=>{
     if(!r||!r.id)return;
     const i=S.tx.findIndex(x=>x.id===r.id),loc=S.tx[i];
@@ -1785,7 +1790,10 @@ function renderBank(){
   const top=[...cats].sort((a,b)=>b[1]-a[1]).slice(0,6);
   const nAc={card:0,bank:0,'':0};TX().forEach(t=>{const a=acct(t);if(a in nAc)nAc[a]++});
   const byYm=new Map();inst.forEach(x=>{const o=byYm.get(x.ym)||[];o.push(x);byYm.set(x.ym,o)});
-  b.innerHTML=`<div class="card"><h2>יתרה בבנק</h2>
+  b.innerHTML=`<div class="card"><h2>תיק אינטראקטיב</h2>
+${S.ib?`<p class="fcbig">${esc(fmtIb(S.ib))}</p>${isFinite(S.ib.pct)?`<p class="hint">${S.ib.pct>0?'עלייה':S.ib.pct<0?'ירידה':'בלי שינוי'} של ${esc(fmtPct(S.ib.pct))} מול הדוח הקודם.</p>`:''}<p class="hint">שווי סגירה${S.ib.d?` של ${esc(dd(S.ib.d))}`:''}. מתעדכן כל בוקר מהדוח, לא בזמן אמת, ולא כולל את תיק ההשקעות של פפר.</p>`:'<p class="hint">עוד לא מחובר. בהגדרות, תחת אינטראקטיב, מדביקים מפתח קריאה ומספר שאילתה. משם השווי יורד כל בוקר.</p>'}
+<p class="hint" style="margin:12px 0 0"><a href="#settings" data-sopen="s-ib">הגדרות החיבור</a></p></div>
+<div class="card"><h2>יתרה בבנק</h2>
 ${now?`<p class="fcbig">${esc(fmt(now.v))}</p><p class="hint">יתרה מחושבת להיום: נקודת ההתחלה מ־${esc(ddm(ex.bal.d))} (${esc(fmt(ex.bal.v))}), ועוד ${now.n} תנועות בבנק וחיובי כרטיס שירדו מאז.${now.un?` ${now.un} תנועות שהוזנו ידנית בלי לציין מאיזה חשבון לא נכללו.`:''}</p>`:'<p class="hint">כדי לבדוק שלא חסרות או כפולות תנועות, הזן את היתרה שמופיעה עכשיו באפליקציית הבנק. בפעם הראשונה זו נקודת ההתחלה. ייבוא של קובץ עו"ש מ־Pepper קובע אותה לבד.</p>'}
 <label class="lbl" for="balIn">היתרה עכשיו באפליקציית הבנק</label>
 <div class="ruleadd"><input class="field" id="balIn" type="number" inputmode="decimal" step="0.01" placeholder="למשל 4284.49"><button class="btn solid sm" data-act="bal-check">${now?'בדוק':'שמור כנקודת התחלה'}</button></div>
@@ -1820,6 +1828,31 @@ function renderSetBank(){const ex=S.ex;$('#setBank').innerHTML=`<div class="gset
 <label>עסקאות עד יום<select class="field" id="exCut">${Array.from({length:28},(_,i)=>i+1).map(d=>`<option value="${d}"${d===ex.cut?' selected':''}>${d}</option>`).join('')}</select></label>
 <label>להתריע כשהיתרה תרד מתחת ל־<input class="field" id="exMin" type="number" inputmode="numeric" step="100" value="${ex.minBal}"></label></div>
 <p class="hint" style="margin:0">עסקה עד היום שבחרת נכנסת לחיוב של אותו חודש, ואחריו לחיוב של החודש הבא. ב־max זה בדרך כלל עד ה־7 לחודש. כשיש תאריך חיוב מהקובץ, הוא קובע.</p>`}
+function renderSetIb(){const el=$('#setIb');if(!el)return;const ib=S.ib;
+  el.innerHTML=`<p class="hint">פעם אחת בפורטל של אינטראקטיב: Performance & Reports, Flex Queries. יוצרים שאילתה עם Net Asset Value (NAV) in Base ליום העסקים האחרון. מפעילים Flex Web Service ויוצרים Token. מדביקים כאן את שניהם. הסיסמה לא נשמרת.</p>
+${ib?`<p class="hint">עודכן לאחרונה: <b>${esc(fmtIb(ib))}</b>${ib.d?` · דוח ${esc(dd(ib.d))}`:''}.</p>`:''}
+<label class="lbl" for="ibTok">Token</label>
+<input class="field" id="ibTok" type="password" autocomplete="off" placeholder="המפתח מהפורטל">
+<label class="lbl" for="ibQ">מספר השאילתה</label>
+<input class="field" id="ibQ" inputmode="numeric" autocomplete="off" placeholder="Query ID">
+<div class="btnrow"><button class="btn solid sm" data-act="ib-save">חבר ועדכן עכשיו</button></div>
+<p class="hint" id="ibErr" style="margin:8px 0 0"></p>`}
+ACT['ib-save']=async btn=>{
+  if(!SY.on){toast('קודם מחברים את הגיליון, בהגדרות');return}
+  const tok=$('#ibTok').value.trim(),q=$('#ibQ').value.trim(),er=$('#ibErr');
+  er.textContent='';btn.disabled=true;
+  try{
+    const r=await Sync.call({action:'ib',tok,q});
+    if(!r||!r.ok){
+      const m=r&&r.err;
+      er.textContent=m==='action'?'הסקריפט בגיליון ישן. מדביקים את apps-script.gs החדש ופורסים מחדש.':m==='ib_bad'?'צריך גם Token וגם מספר שאילתה.':m==='ib_parse'?(r.msg||'הדוח בלי שווי תיק.'):(r&&r.msg)||'אינטראקטיב לא החזירה שווי. בודקים את המפתח ואת השאילתה.';
+      return;
+    }
+    if(r.ib){S.ib=normIb(r.ib);try{localStorage.setItem('kesef-ib',JSON.stringify(S.ib))}catch{}}
+    $('#ibTok').value='';toast(S.ib?`התיק עודכן: ${fmtIb(S.ib)}. מעכשיו כל בוקר.`:'החיבור נשמר');render();
+  }catch(e){er.textContent=errText(e)}
+  finally{btn.disabled=false}
+};
 document.addEventListener('change',e=>{const id=e.target.id;if(id==='exBill'||id==='exCut'||id==='exMin'){const v=Math.round(+e.target.value||0);change(()=>{if(id==='exBill')S.ex.bill=clamp(v,1,28);else if(id==='exCut')S.ex.cut=clamp(v,1,28);else S.ex.minBal=v},{cfg:true,undo:false})}});
 
 /* ---------- customer receipts (osek patur) ---------- */
@@ -1993,7 +2026,7 @@ function renderSetDyn(){const keep={},ae=document.activeElement,aid=ae?.id;['wEm
   const F={push:pushCard,mail:weeklyCard,auto:autoCard,siri:siriCard,widget:widgetCard};
   $$('[data-sdyn]').forEach(el=>{el.innerHTML=!SY.on?NOSYNC:SY.ro?'<p class="hint" style="margin:0">לא זמין בחשבון לצפייה בלבד.</p>':cardBody(F[el.dataset.sdyn]())});
   Object.keys(keep).forEach(id=>{const el=$('#'+id);if(el){if(el.type==='checkbox')el.checked=keep[id];else el.value=keep[id]}});if(aid)$('#'+aid)?.focus({preventScroll:true})}
-function renderSettings(){$('#pName').value=S.profile.name;$('#pMe').value=ui.me;renderBudget();renderSetBank();renderLockCard();renderSetDyn()}
+function renderSettings(){$('#pName').value=S.profile.name;$('#pMe').value=ui.me;renderBudget();renderSetBank();renderSetIb();renderLockCard();renderSetDyn()}
 document.addEventListener('click',e=>{const a=e.target.closest('[data-sopen]');if(!a)return;const id=a.dataset.sopen;setTimeout(()=>{const d=$('#'+id);if(d){d.open=true;d.scrollIntoView({block:'start'})}},60)});
 
 /* ---------- app lock: Face ID / Touch ID + code, per device ---------- */

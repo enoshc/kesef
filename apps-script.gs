@@ -10,7 +10,7 @@ var FOLDER = 'הכסף שלי - קבלות';
 var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's', 'הערה', 'תגיות', 'x'];
 var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11, note: 12, tags: 13, x: 14};
 var TECH = C.s - C.id + 1;
-var VERSION = 14;
+var VERSION = 15;
 var AUTO_ = function () { return typeof KESEF_AUTO !== 'undefined' && !!KESEF_AUTO; };
 var DEVS = 'מכשירים';
 var DH = ['dev', 'name', 'endpoint', 'pub', 'prefs', 'tokens', 'queue', 'updated'];
@@ -70,6 +70,7 @@ function doPost(e) {
     if (req.action === 'notifs') return out_(notifs_(req));
     if (req.action === 'ing-token') return out_(ingToken_(req));
     if (req.action === 'ing-test') return out_(ingTest_(req));
+    if (req.action === 'ib') return out_(ibSave_(req));
     return out_({ok: false, err: 'action'});
   } catch (err) {
     return out_({ok: false, err: 'server', msg: String(err && err.message || err)});
@@ -88,6 +89,85 @@ function tokenOf_(name, rotate, len) {
   var t = props.getProperty(name);
   if (!t) { t = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '').slice(0, len); props.setProperty(name, t); }
   return {ok: true, v: VERSION, tok: t};
+}
+
+/* שווי תיק מאינטראקטיב, פעם ביום. הטוקן נשמר רק בהגדרות הסקריפט, לא בגיליון. */
+function ibSnap_() {
+  try { var o = JSON.parse(PropertiesService.getScriptProperties().getProperty('IBNAV') || ''); } catch (e) { return null; }
+  if (!o || !isFinite(+o.v)) return null;
+  return {v: Math.round(+o.v * 100) / 100, ccy: String(o.ccy || '').slice(0, 8), d: String(o.d || '').slice(0, 10), at: +o.at || 0, pct: isFinite(+o.pct) ? Math.round(+o.pct * 100) / 100 : null};
+}
+function ibAttr_(s, name) {
+  var m = new RegExp(name + '="([^"]*)"', 'i').exec(s || '');
+  return m ? m[1] : '';
+}
+function ibParse_(xml) {
+  var re = /<([A-Za-z0-9]+)([^>]*?)\/?>/g, m, best = null;
+  while ((m = re.exec(xml))) {
+    if (!/EquitySummary|ChangeInNAV|NetAssetValue/i.test(m[1])) continue;
+    var raw = ibAttr_(m[2], 'total') || ibAttr_(m[2], 'endingValue') || ibAttr_(m[2], 'endingNAV') || ibAttr_(m[2], 'netAssetValue');
+    var v = parseFloat(raw);
+    if (!isFinite(v)) continue;
+    var d = ibAttr_(m[2], 'reportDate') || ibAttr_(m[2], 'toDate') || '';
+    if (/^\d{8}$/.test(d)) d = d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8);
+    var pctRaw = ibAttr_(m[2], 'percentChange') || ibAttr_(m[2], 'pctChange') || ibAttr_(m[2], 'twr') || ibAttr_(m[2], 'changePct');
+    var prior = parseFloat(ibAttr_(m[2], 'priorTotal') || ibAttr_(m[2], 'startingValue') || '');
+    var pct = parseFloat(pctRaw);
+    if (!isFinite(pct) && isFinite(prior) && prior !== 0) pct = (v - prior) / Math.abs(prior) * 100;
+    best = {v: Math.round(v * 100) / 100, d: d, ccy: ibAttr_(m[2], 'currency') || ibAttr_(m[2], 'currencyPrimary') || 'USD'};
+    if (isFinite(pct)) best.pct = Math.round(pct * 100) / 100;
+  }
+  return best;
+}
+function ibEnsure_() {
+  var has = false, all = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < all.length; i++) if (all[i].getHandlerFunction() === 'ibDaily') has = true;
+  if (!has) ScriptApp.newTrigger('ibDaily').timeBased().everyDays(1).atHour(8).create();
+}
+function ibPull_() {
+  var props = PropertiesService.getScriptProperties();
+  var tok = props.getProperty('IBTOK'), q = props.getProperty('IBQ');
+  if (!tok || !q) return {ok: false, err: 'ib_none'};
+  var base = 'https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/';
+  var opt = {muteHttpExceptions: true, headers: {'User-Agent': 'kesef/15'}};
+  var send = UrlFetchApp.fetch(base + 'SendRequest?t=' + encodeURIComponent(tok) + '&q=' + encodeURIComponent(q) + '&v=3', opt);
+  var head = send.getContentText() || '';
+  var code = /<ReferenceCode>(\d+)<\/ReferenceCode>/.exec(head);
+  if (!code) {
+    var msg = /<ErrorMessage>([^<]*)/.exec(head);
+    return {ok: false, err: 'ib_flex', msg: msg ? String(msg[1]).slice(0, 180) : 'no_ref'};
+  }
+  var url = /<Url>([^<]+)<\/Url>/.exec(head);
+  var get = (url ? url[1] : base + 'GetStatement') + '?t=' + encodeURIComponent(tok) + '&q=' + code[1] + '&v=3';
+  var body = '', nav = null;
+  for (var n = 0; n < 4 && !nav; n++) {
+    if (n) Utilities.sleep(3000);
+    body = UrlFetchApp.fetch(get, opt).getContentText() || '';
+    if (/generation in progress|1019/i.test(body)) continue;
+    nav = ibParse_(body);
+  }
+  if (!nav) return {ok: false, err: 'ib_parse', msg: 'הדוח לא כלל שווי תיק. בשאילתה צריך את Net Asset Value in Base.'};
+  var prev = ibSnap_();
+  if (!isFinite(+nav.pct) && prev && prev.v && prev.d && prev.d !== nav.d) nav.pct = Math.round((nav.v - prev.v) / Math.abs(prev.v) * 10000) / 100;
+  nav.at = Date.now();
+  props.setProperty('IBNAV', JSON.stringify(nav));
+  return {ok: true, v: VERSION, ib: nav};
+}
+function ibDaily() {
+  try { ibPull_(); } catch (e) {}
+}
+function ibSave_(req) {
+  var props = PropertiesService.getScriptProperties();
+  if (req.clear) {
+    props.deleteProperty('IBTOK'); props.deleteProperty('IBQ'); props.deleteProperty('IBNAV');
+    return {ok: true, v: VERSION, ib: null};
+  }
+  var tok = String(req.tok || '').trim(), q = String(req.q || '').replace(/\D/g, '');
+  if (tok.length < 8 || q.length < 3) return {ok: false, err: 'ib_bad'};
+  props.setProperty('IBTOK', tok);
+  props.setProperty('IBQ', q);
+  try { ibEnsure_(); } catch (e) {}
+  return ibPull_();
 }
 
 /* ---------- סוגי תנועות: הקטגוריה קובעת מה זה, הכיוון (סוג) קובע אם נכנס או יצא ----------
@@ -258,7 +338,7 @@ function sync_(req) {
     var curCfg = (req.cfg && (+req.cfg.u || 0) >= cu) ? req.cfg : JSON.parse(cv[0] || '{}');
     notify_(req, append, it.newMsgs, data, curCfg, tz, now);
   } catch (e) {}
-  return {ok: true, v: VERSION, now: now, tx: out, ids: req.full ? ids : undefined, cfg: cfg,
+  return {ok: true, v: VERSION, now: now, tx: out, ids: req.full ? ids : undefined, cfg: cfg, ib: ibSnap_(),
     items: it.items, itemIds: req.full ? it.ids : undefined, sheet: SpreadsheetApp.getActive().getUrl()};
 }
 
