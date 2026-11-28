@@ -81,7 +81,7 @@ function normEx(e){e=e&&typeof e==='object'?e:{};const str=(a,n=30,m=40)=>Array.
   const biz=normBiz(e.biz);const maxN=docs.reduce((m,d)=>Math.max(m,d.n),0);if(biz.next<=maxN)biz.next=maxN+1;
   return {self:str(e.self,6),own:str(e.own,20),nosub:str(e.nosub,80,60),bill:clamp(Math.round(+e.bill||10),1,28),cut:clamp(Math.round(+e.cut||7),1,28),bal,minBal:Math.round(+e.minBal||0),people:str(e.people,40,30),biz,docs}}
 function normTags(a){return Array.isArray(a)?[...new Set(a.map(x=>String(x||'').replace(/,/g,' ').trim().slice(0,30)).filter(Boolean))].slice(0,8):[]}
-function normRec(r){if(!r||typeof r!=='object')return null;const id=String(r.id||'').replace(/[^a-z0-9]/g,'').slice(0,8);if(id.length!==8)return null;const a=Math.round(Math.abs(+r.a||0)*100)/100;if(!(a>0))return null;return {id,n:String(r.n||'').slice(0,60),a,t:r.t==='inc'?'inc':'exp',c:String(r.c||''),day:clamp(Math.round(+r.day||1),1,31),start:/^\d{4}-\d{2}$/.test(r.start)?r.start:nowYm,skip:Array.isArray(r.skip)?r.skip.filter(x=>/^\d{4}-\d{2}$/.test(x)).slice(-60):[],on:r.on!==false}}
+function normRec(r){if(!r||typeof r!=='object')return null;const id=String(r.id||'').replace(/[^a-z0-9]/g,'').slice(0,8);if(id.length!==8)return null;const a=Math.round(Math.abs(+r.a||0)*100)/100;if(!(a>0))return null;const o={id,n:String(r.n||'').slice(0,60),a,t:r.t==='inc'?'inc':'exp',c:String(r.c||''),day:clamp(Math.round(+r.day||1),1,31),start:/^\d{4}-\d{2}$/.test(r.start)?r.start:nowYm,skip:Array.isArray(r.skip)?r.skip.filter(x=>/^\d{4}-\d{2}$/.test(x)).slice(-60):[],on:r.on!==false};if(/^\d{4}-\d{2}$/.test(r.end))o.end=r.end;return o}
 function normRules(o){const r={};if(o&&typeof o==='object')Object.keys(o).slice(0,600).forEach(k=>{if(k&&k.length<=60&&typeof o[k]==='string')r[k]=o[k].slice(0,40)});return r}
 function normWeekly(w){return {emails:Array.isArray(w?.emails)?w.emails.map(String).slice(0,5):[],on:!!w?.on,freq:['week','month','both'].includes(w?.freq)?w.freq:'month',mday:clamp(Math.round(+w?.mday||11),1,28)}}
 function normIb(o){if(!o||!isFinite(+o.v))return null;const d=YMD.test(o.d)?o.d:'';const out={v:Math.round(+o.v*100)/100,ccy:String(o.ccy||'USD').slice(0,8),d,at:+o.at||0};if(isFinite(+o.pct))out.pct=Math.round(+o.pct*100)/100;return out}
@@ -453,7 +453,7 @@ function renderHome(){
   const f=[['הכנסות',fmt(inc),ch(inc,pi)],['הוצאות',fmt(spend),ch(spend,pspend)]];
   $('#figs').innerHTML=f.map(x=>`<div><span>${esc(x[0])}</span><b>${esc(x[1])}</b><small>${esc(x[2])}</small></div>`).join('');
   $('#noteHome').hidden=!sample;$('#hName').textContent=S.profile.name;
-  renderIbBan();
+  renderIbBan();renderPoloBan();
   renderHomeMsg();renderHomeAlbum();renderForecast();renderInbox();renderCardHome();
   renderAlerts();renderGoal();renderCats();drawChart();
   const rec=inM(cur).sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0).slice(0,4);
@@ -469,6 +469,23 @@ function renderIbBan(){
   const when=ib.d?ib.d.slice(8)+'/'+ib.d.slice(5,7):'';
   const pct=isFinite(ib.pct)?`<small class="${ib.pct>0?'up':ib.pct<0?'dn':''}">${esc(fmtPct(ib.pct))}${when?' · '+esc(when):''}</small>`:`<small class="k">${when?esc(when):'שווי סגירה'}</small>`;
   el.innerHTML=`<span><small class="k">אינטראקטיב</small><b>${esc(fmtIb(ib))}</b></span>${pct}`;
+}
+function poloPlan(){
+  const parts=[{n:'חובה',year:2816},{n:'צד ג׳',year:3496}];
+  const due=[];let ym='2026-02';
+  while(ym<='2027-01'){due.push(ym+'-28');ym=shiftYm(ym,1)}
+  const leftN=due.filter(d=>d>todayStr).length,n=due.length;
+  const rows=parts.map(p=>{const left=Math.round(p.year*leftN/n*100)/100;return {n:p.n,year:p.year,left,paid:Math.round((p.year-left)*100)/100}});
+  return {rows,leftN,paidN:n-leftN,n,paid:rows.reduce((s,r)=>s+r.paid,0),left:rows.reduce((s,r)=>s+r.left,0),total:parts.reduce((s,p)=>s+p.year,0)};
+}
+function renderPoloBan(){
+  const el=$('#poloBan');if(!el)return;
+  const p=poloPlan(),pct=p.n?Math.round(p.paidN/p.n*100):0;
+  el.hidden=false;el.href='#budget';
+  el.innerHTML=`<span class="k">ביטוח הפולו · ביטוח ישיר · עד 28/2/2027</span>
+<div class="prow"><span><small class="k">שולם</small><b>${esc(fmt(p.paid))}</b></span><span><small class="k">נשאר</small><b>${esc(fmt(p.left))}</b></span></div>
+<div class="pbar" role="img" aria-label="${pct}% שולם"><i style="width:${pct}%"></i></div>
+<small class="k">${p.leftN?`${p.leftN} תשלומים נשארו`:'התשלומים הסתיימו'} · ${p.rows.map(r=>`${esc(r.n)} ${esc(fmt(r.paid))} מתוך ${esc(fmt(r.year))}`).join(' · ')}</small>`;
 }
 let showAllAlerts=false;
 function renderAlerts(){
@@ -1388,7 +1405,7 @@ const isRecTx=t=>RECID.test(t.id);
 function genRecurring(){
   const ids=[];
   S.rec.forEach(r=>{if(!r.on)return;let ym=r.start,g=0;
-    while(ym<=nowYm&&g++<72){const d=`${ym}-${p2(Math.min(r.day,daysIn(ym)))}`;
+    while(ym<=nowYm&&g++<72&&(!r.end||ym<=r.end)){const d=`${ym}-${p2(Math.min(r.day,daysIn(ym)))}`;
       if(d<=todayStr&&!r.skip.includes(ym)){const id=recId(r,ym);if(!S.tx.some(t=>t.id===id)){S.tx.push({id,d,t:r.t,a:r.a,c:r.c,n:r.n,img:'',u:0});ids.push(id)}}
       ym=shiftYm(ym,1)}});
   return ids;
@@ -1397,7 +1414,7 @@ function runRec(quiet){if(sample||SY.ro)return false;const ids=genRecurring();if
 function forecast(){
   if(ui.cur!==nowYm)return null;
   const ym=nowYm,dim=daysIn(ym),day=T0.getDate(),inc=tot(ym,'inc'),exp=tot(ym,'exp');
-  const up=S.rec.filter(r=>r.on&&r.start<=ym&&!r.skip.includes(ym)&&!S.tx.some(t=>t.id===recId(r,ym)))
+  const up=S.rec.filter(r=>r.on&&r.start<=ym&&(!r.end||ym<=r.end)&&!r.skip.includes(ym)&&!S.tx.some(t=>t.id===recId(r,ym)))
     .map(r=>({r,d:Math.min(r.day,dim)})).sort((a,b)=>a.d-b.d);
   const pt=up.map(x=>({t:x.r.t,c:x.r.c,a:x.r.a})),upInc=sumBy(pt,incA),upExp=sumBy(pt,t=>expA(t)+savA(t));
   const varOf=m=>sumBy(inM(m).filter(t=>!isRecTx(t)),expA);
@@ -1414,19 +1431,20 @@ function renderForecast(){
 }
 function renderRecList(){
   const l=S.rec.slice().sort((a,b)=>(b.on-a.on)||a.day-b.day);
-  $('#recList').innerHTML=l.length?l.map(r=>{const c=cat(r.c);const yr=/פולו/.test(r.n)?`, ${fmt(Math.round(r.a*12))} לשנה`:'';return `<button class="recr${r.on?'':' off'}" data-rec="${esc(r.id)}"><span class="ri" style="--c:${col(c)}"><svg class="ic"><use href="#i-repeat"/></svg></span><span><b>${esc(r.n||c?.name||'')}</b><small>${esc(c?.name||'')}, כל ${r.day} בחודש${yr}${r.on?'':', מושהית'}</small></span><span class="amt2" style="${r.t==='inc'?'color:var(--inc)':''}">${r.t==='inc'?'+':''}${esc(fmt(r.a))}</span></button>`}).join(''):'<p class="hint" style="margin:0">עוד אין קבועות. אפשר להוסיף כאן, או לסמן "חוזרת כל חודש" כשמוסיפים הוצאה.</p>';
+  $('#recList').innerHTML=l.length?l.map(r=>{const c=cat(r.c);const tail=r.end?`, עד ${r.end.slice(5)}/${r.end.slice(0,4)}`:(/פולו/.test(r.n)?`, ${fmt(Math.round(r.a*12))} לשנה`:'');return `<button class="recr${r.on?'':' off'}" data-rec="${esc(r.id)}"><span class="ri" style="--c:${col(c)}"><svg class="ic"><use href="#i-repeat"/></svg></span><span><b>${esc(r.n||c?.name||'')}</b><small>${esc(c?.name||'')}, כל ${r.day} בחודש${tail}${r.on?'':', מושהית'}</small></span><span class="amt2" style="${r.t==='inc'?'color:var(--inc)':''}">${r.t==='inc'?'+':''}${esc(fmt(r.a))}</span></button>`}).join(''):'<p class="hint" style="margin:0">עוד אין קבועות. אפשר להוסיף כאן, או לסמן "חוזרת כל חודש" כשמוסיפים הוצאה.</p>';
 }
 function seedPolo(){
   if(sample||SY.ro)return;
-  try{if(localStorage.getItem('kesef-polo')==='1')return}catch{}
+  try{if(localStorage.getItem('kesef-polo2')==='1')return}catch{}
   const c=S.cats.find(x=>x.k==='exp'&&!x.int&&/תחבורה/.test(x.name))||S.cats.find(x=>x.k==='exp'&&!x.int&&/ביטוח/.test(x.name));
   if(!c)return;
-  const rows=[['חובה · ישיר · פולו 2016',Math.round(2816/12*100)/100],['צד ג׳ · ישיר · פולו 2016',Math.round(3496/12*100)/100]].filter(([n])=>!S.rec.some(r=>r.n===n));
-  try{localStorage.setItem('kesef-polo','1')}catch{}
-  if(!rows.length)return;
-  const start=shiftYm(nowYm,1);
-  change(()=>{rows.forEach(([n,a])=>S.rec.push({id:rid(8),n,a,t:'exp',c:c.id,day:10,start,skip:[],on:true}))},{cfg:true,undo:false});
-  toast('נוספו ביטוחי הפולו לתקציב, מהעשירי בחודש הבא');
+  const rows=[{key:'חובה',n:'חובה · ישיר · פולו 2016',a:Math.round(2816/12*100)/100},{key:'צד',n:'צד ג׳ · ישיר · פולו 2016',a:Math.round(3496/12*100)/100}];
+  try{localStorage.setItem('kesef-polo2','1')}catch{}
+  change(()=>{rows.forEach(row=>{
+    const r=S.rec.find(x=>/פולו/.test(x.n)&&x.n.includes(row.key));
+    if(r)Object.assign(r,{n:row.n,a:row.a,day:28,end:'2027-01',on:true,start:r.start&&r.start<'2026-12'?r.start:'2026-12'});
+    else S.rec.push({id:rid(8),n:row.n,a:row.a,t:'exp',c:c.id,day:28,start:'2026-12',end:'2027-01',skip:[],on:true});
+  })},{cfg:true,undo:false});
 }
 let recEdit=null,recType='exp';
 function recCats(sel){const l=S.cats.filter(c=>c.k===recType);$('#recC').innerHTML=l.map(c=>`<option value="${esc(c.id)}"${c.id===sel?' selected':''}>${esc(c.name)}</option>`).join('')}
@@ -1801,7 +1819,7 @@ function cardBill(ym){const l=TX().filter(t=>acct(t)==='card'&&billKey(billDate(
 function balAt(D){const b=S.ex.bal;if(!b)return null;let v=b.v,n=0,un=0;
   TX().forEach(t=>{const ac=acct(t);if(ac==='bank'){if(t.d>b.d&&t.d<=D){v+=flow(t);n++}}else if(ac==='card'){const bd=billDate(t);if(bd>b.d&&bd<=D){v+=flow(t);n++}}else if(ac===''&&t.d>b.d&&t.d<=D)un++});
   return {v:Math.round(v*100)/100,n,un}}
-function upRecInc(from,to){let s=0;S.rec.forEach(r=>{if(!r.on||r.t!=='inc')return;const c=cat(r.c);if(!c||c.int||c.k!=='inc')return;for(const ym of [ymOf(from),shiftYm(ymOf(from),1)]){if(ym<r.start||r.skip.includes(ym))continue;const d=`${ym}-${p2(Math.min(r.day,daysIn(ym)))}`;if(d>from&&d<=to&&!S.tx.some(t=>t.id===recId(r,ym)))s+=r.a}});return s}
+function upRecInc(from,to){let s=0;S.rec.forEach(r=>{if(!r.on||r.t!=='inc')return;const c=cat(r.c);if(!c||c.int||c.k!=='inc')return;for(const ym of [ymOf(from),shiftYm(ymOf(from),1)]){if(ym<r.start||(r.end&&ym>r.end)||r.skip.includes(ym))continue;const d=`${ym}-${p2(Math.min(r.day,daysIn(ym)))}`;if(d>from&&d<=to&&!S.tx.some(t=>t.id===recId(r,ym)))s+=r.a}});return s}
 function cardForecast(){const ym=nextBillYm(),b=cardBill(ym),hasCard=TX().some(t=>acct(t)==='card');if(!hasCard&&!b.a)return null;
   const now=balAt(todayStr),inc=now?upRecInc(todayStr,b.d):0,after=now?Math.round((now.v+inc-b.a)*100)/100:null;
   return {...b,now,inc,after,low:after!==null&&after<S.ex.minBal}}

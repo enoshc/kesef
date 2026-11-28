@@ -99,6 +99,11 @@ a.ibban b{font:700 26px/1.1 Rubik,sans-serif}
 a.ibban .k{display:block;color:var(--mute);font-size:13px;font-weight:700}
 a.ibban .up{color:var(--inc);font-weight:700}
 a.ibban .dn{color:var(--over);font-weight:700}
+a.poloban{display:block;text-decoration:none;color:inherit}
+.poloban .prow{display:flex;justify-content:space-between;gap:16px;margin-top:4px}
+.poloban .prow b{font:700 26px/1.1 Rubik,sans-serif}
+.pbar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:10px 0 8px}
+.pbar i{display:block;height:100%;background:var(--inc)}
 .card{background:var(--bg);border:1px solid var(--line);border-radius:18px;padding:18px clamp(14px,2.5vw,22px)}
 .card+.card{margin-top:0}
 .stack{display:grid;gap:16px}
