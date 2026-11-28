@@ -1421,7 +1421,7 @@ function seedPolo(){
   try{if(localStorage.getItem('kesef-polo')==='1')return}catch{}
   const c=S.cats.find(x=>x.k==='exp'&&!x.int&&/תחבורה/.test(x.name))||S.cats.find(x=>x.k==='exp'&&!x.int&&/ביטוח/.test(x.name));
   if(!c)return;
-  const rows=[['ביטוח חובה, פולו 2016',Math.round(2816/12*100)/100],['ביטוח צד ג׳, פולו 2016',Math.round(3496/12*100)/100]].filter(([n])=>!S.rec.some(r=>r.n===n));
+  const rows=[['חובה · ישיר · פולו 2016',Math.round(2816/12*100)/100],['צד ג׳ · ישיר · פולו 2016',Math.round(3496/12*100)/100]].filter(([n])=>!S.rec.some(r=>r.n===n));
   try{localStorage.setItem('kesef-polo','1')}catch{}
   if(!rows.length)return;
   const start=shiftYm(nowYm,1);

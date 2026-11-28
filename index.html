@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>
-(function(){var BUILD=42;if(location.protocol!=='https:')return;function go(){fetch('https://raw.githubusercontent.com/enoshc/kesef/main/version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){var b=j&&+j.build;if(!(b>BUILD))return;var key='kesef-up-'+b;var n=+(sessionStorage.getItem(key)||0);if(n>=2)return;sessionStorage.setItem(key,String(n+1));var done=function(){var u=new URL(location.href);u.searchParams.set('b',b);location.replace(u.pathname+u.search+u.hash)};if(!window.caches){done();return}caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}).then(done,done)}).catch(function(){})}go();document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')go()})}());
+(function(){var BUILD=43;if(location.protocol!=='https:')return;function go(){fetch('https://raw.githubusercontent.com/enoshc/kesef/main/version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){var b=j&&+j.build;if(!(b>BUILD))return;var key='kesef-up-'+b;var n=+(sessionStorage.getItem(key)||0);if(n>=2)return;sessionStorage.setItem(key,String(n+1));var done=function(){var u=new URL(location.href);u.searchParams.set('b',b);location.replace(u.pathname+u.search+u.hash)};if(!window.caches){done();return}caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}).then(done,done)}).catch(function(){})}go();document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')go()})}());
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>הכסף שלי</title>
@@ -567,6 +567,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=38"></script>
+<script src="app.js?v=39"></script>
 </body>
 </html>
