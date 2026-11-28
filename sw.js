@@ -1,15 +1,28 @@
-const C='kesef-v39';
-const A=['./','./index.html','./app.css?v=22','./app.js?v=35','./manifest.webmanifest','./icon-192-2.png','./icon-512-2.png','./apple-touch-icon-2.png'];
+const C='kesef-v40';
+const A=['./','./index.html','./app.css?v=22','./app.js?v=36','./manifest.webmanifest','./icon-192-2.png','./icon-512-2.png','./apple-touch-icon-2.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(A)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{
   const r=e.request;if(r.method!=='GET')return;
   const u=new URL(r.url);
   if(/script\.google(usercontent)?\.com$/.test(u.hostname)||u.hostname!==location.hostname||/\.gs$/.test(u.pathname))return;
-  e.respondWith(caches.match(r).then(m=>{
-    const net=fetch(r).then(res=>{if(res&&(res.ok||res.type==='opaque')){const cp=res.clone();caches.open(C).then(c=>c.put(r,cp))}return res}).catch(()=>m);
+  const shell=r.mode==='navigate'||/\.(?:html|js|css|json|webmanifest)$/.test(u.pathname);
+  e.respondWith((async()=>{
+    if(shell){
+      try{
+        const res=await fetch(r);
+        if(res&&res.ok){const cp=res.clone();caches.open(C).then(c=>c.put(r,cp))}
+        return res;
+      }catch(err){
+        const m=await caches.match(r);
+        if(m)return m;
+        throw err;
+      }
+    }
+    const m=await caches.match(r);
+    const net=fetch(r).then(res=>{if(res&&res.ok){const cp=res.clone();caches.open(C).then(c=>c.put(r,cp))}return res}).catch(()=>m);
     return m||net;
-  }));
+  })());
 });
 
 function idbGet(k){return new Promise(res=>{try{const r=indexedDB.open('kesef',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{try{const q=r.result.transaction('kv','readonly').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>res(null)}catch(e){res(null)}};r.onerror=()=>res(null)}catch(e){res(null)}})}

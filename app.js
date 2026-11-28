@@ -2126,6 +2126,6 @@ window.addEventListener('pageshow',e=>{if(e.persisted){backToNow();render()}});
 window.addEventListener('online',()=>{if(SY.on)Sync.run()});
 window.addEventListener('offline',()=>{if(SY.on)setSync('offline')});
 try{navigator.storage?.persist?.()}catch{}
-if('serviceWorker' in navigator&&location.protocol==='https:'){const hadSW=!!navigator.serviceWorker.controller;let swReload=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadSW&&!swReload){swReload=true;location.reload()}});navigator.serviceWorker.register('sw.js').then(r=>{document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')r.update().catch(()=>{})})}).catch(()=>{})}
+if('serviceWorker' in navigator&&location.protocol==='https:'){const hadSW=!!navigator.serviceWorker.controller;let swReload=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadSW&&!swReload){swReload=true;location.reload()}});navigator.serviceWorker.register('sw.js').then(r=>{r.update().catch(()=>{});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')r.update().catch(()=>{})})}).catch(()=>{})}
 window.__kesef={get S(){return S},get SY(){return SY},Sync};
 })();
