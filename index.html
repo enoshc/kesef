@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>
-(function(){var BUILD=40;if(location.protocol!=='https:')return;function go(){fetch('https://raw.githubusercontent.com/enoshc/kesef/main/version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){var b=j&&+j.build;if(!(b>BUILD))return;var n=+(sessionStorage.getItem('kesef-up')||0);if(n>=2)return;sessionStorage.setItem('kesef-up',String(n+1));var done=function(){var u=new URL(location.href);u.searchParams.set('b',b);location.replace(u.pathname+u.search+u.hash)};if(!window.caches){done();return}caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}).then(done,done)}).catch(function(){})}go();document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')go()})}());
+(function(){var BUILD=41;if(location.protocol!=='https:')return;function go(){fetch('https://raw.githubusercontent.com/enoshc/kesef/main/version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){var b=j&&+j.build;if(!(b>BUILD))return;var key='kesef-up-'+b;var n=+(sessionStorage.getItem(key)||0);if(n>=2)return;sessionStorage.setItem(key,String(n+1));var done=function(){var u=new URL(location.href);u.searchParams.set('b',b);location.replace(u.pathname+u.search+u.hash)};if(!window.caches){done();return}caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}).then(done,done)}).catch(function(){})}go();document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')go()})}());
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>הכסף שלי</title>
@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=22">
+<link rel="stylesheet" href="app.css?v=23">
 </head>
 <body>
 <a class="skip" href="#main">דילוג לתוכן</a>
@@ -111,6 +111,7 @@
       </div>
     </div></div>
     <div class="pad grid2">
+      <a class="card span2 ibban" id="ibBan" href="#bank" hidden></a>
       <div class="note span2" id="noteHome" hidden><span>אלה נתוני דוגמה כדי לראות איך זה עובד. אפשר לערוך אותם או להתחיל מאפס.</span><button class="btn sm" data-act="fresh">התחל טבלה ריקה</button></div>
       <div class="card span2" id="homeInbox" hidden></div>
       <div class="card msgcard" id="homeMsg" hidden></div>
@@ -566,6 +567,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=36"></script>
+<script src="app.js?v=37"></script>
 </body>
 </html>

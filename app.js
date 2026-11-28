@@ -453,11 +453,22 @@ function renderHome(){
   const f=[['הכנסות',fmt(inc),ch(inc,pi)],['הוצאות',fmt(spend),ch(spend,pspend)]];
   $('#figs').innerHTML=f.map(x=>`<div><span>${esc(x[0])}</span><b>${esc(x[1])}</b><small>${esc(x[2])}</small></div>`).join('');
   $('#noteHome').hidden=!sample;$('#hName').textContent=S.profile.name;
+  renderIbBan();
   renderHomeMsg();renderHomeAlbum();renderForecast();renderInbox();renderCardHome();
   renderAlerts();renderGoal();renderCats();drawChart();
   const rec=inM(cur).sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0).slice(0,4);
   $('#recent').innerHTML=rec.length?`<div class="dayl">${rec.map(t=>txRow(t,true)).join('')}</div>`:'<p class="empty">אין תנועות בחודש הזה.</p>';
   hydrate($('#recent'));
+}
+function renderIbBan(){
+  const el=$('#ibBan');if(!el)return;
+  const ib=S.ib;
+  el.hidden=false;
+  if(!ib){el.href='#settings';el.dataset.sopen='s-ib';el.innerHTML=`<span><b>אינטראקטיב</b><small class="k">שווי התיק, כל בוקר</small></span><span class="lnk">חבר</span>`;return}
+  el.href='#bank';delete el.dataset.sopen;
+  const when=ib.d?ib.d.slice(8)+'/'+ib.d.slice(5,7):'';
+  const pct=isFinite(ib.pct)?`<small class="${ib.pct>0?'up':ib.pct<0?'dn':''}">${esc(fmtPct(ib.pct))}${when?' · '+esc(when):''}</small>`:`<small class="k">${when?esc(when):'שווי סגירה'}</small>`;
+  el.innerHTML=`<span><small class="k">אינטראקטיב</small><b>${esc(fmtIb(ib))}</b></span>${pct}`;
 }
 let showAllAlerts=false;
 function renderAlerts(){

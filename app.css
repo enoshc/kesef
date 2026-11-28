@@ -94,6 +94,11 @@ label.chk input{width:22px;height:22px;accent-color:var(--inc);flex:none}
 .pad{padding:18px max(4vw,12px) calc(116px + env(safe-area-inset-bottom,0px));max-width:1240px;margin:0 auto}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
 .span2{grid-column:1/-1}
+a.ibban{display:flex;align-items:center;justify-content:space-between;gap:12px;text-decoration:none;color:inherit}
+a.ibban b{font:700 26px/1.1 Rubik,sans-serif}
+a.ibban .k{display:block;color:var(--mute);font-size:13px;font-weight:700}
+a.ibban .up{color:var(--inc);font-weight:700}
+a.ibban .dn{color:var(--over);font-weight:700}
 .card{background:var(--bg);border:1px solid var(--line);border-radius:18px;padding:18px clamp(14px,2.5vw,22px)}
 .card+.card{margin-top:0}
 .stack{display:grid;gap:16px}
