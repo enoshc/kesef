@@ -534,6 +534,15 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
 .lockic .ic{width:34px;height:34px}
 .lockf{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;width:100%}
 .lockf .field{text-align:center;letter-spacing:.3em;font-size:20px}
+.lockic-face{display:none}
+.lockface{display:none;margin:0;font-weight:600}
+.lock.is-face .lockf,.lock.is-face #lockErr,.lock.is-face #lockForgot{display:none}
+.lock.is-face .lockic-lock{display:none}
+.lock.is-face .lockic-face{display:block}
+.lock.is-face .lockface{display:block}
+.lock.is-face .lockic{animation:lockpulse 1.4s ease-in-out infinite}
+@keyframes lockpulse{50%{transform:scale(1.06)}}
+@media (prefers-reduced-motion:reduce){.lock.is-face .lockic{animation:none}}
 body.locked{overflow:hidden}
 /* read-only partner */
 body.ro .fab,body.ro .acts,body.ro #addRow,body.ro #recAdd,body.ro #addE,body.ro #addI,body.ro #addT,body.ro [data-act=rv-all],body.ro .ruleadd{display:none!important}

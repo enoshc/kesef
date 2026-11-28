@@ -1,5 +1,5 @@
-const C='kesef-v44';
-const A=['./','./index.html','./app.css?v=24','./app.js?v=40','./manifest.webmanifest','./icon-192-2.png','./icon-512-2.png','./apple-touch-icon-2.png'];
+const C='kesef-v45';
+const A=['./','./index.html','./app.css?v=25','./app.js?v=41','./manifest.webmanifest','./icon-192-2.png','./icon-512-2.png','./apple-touch-icon-2.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(A)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{

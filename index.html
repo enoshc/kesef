@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <script>
-(function(){var BUILD=44;if(location.protocol!=='https:')return;function go(){fetch('https://raw.githubusercontent.com/enoshc/kesef/main/version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){var b=j&&+j.build;if(!(b>BUILD))return;var key='kesef-up-'+b;var n=+(sessionStorage.getItem(key)||0);if(n>=2)return;sessionStorage.setItem(key,String(n+1));var done=function(){var u=new URL(location.href);u.searchParams.set('b',b);location.replace(u.pathname+u.search+u.hash)};if(!window.caches){done();return}caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}).then(done,done)}).catch(function(){})}go();document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')go()})}());
+(function(){var BUILD=45;if(location.protocol!=='https:')return;function go(){fetch('https://raw.githubusercontent.com/enoshc/kesef/main/version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){var b=j&&+j.build;if(!(b>BUILD))return;var key='kesef-up-'+b;var n=+(sessionStorage.getItem(key)||0);if(n>=2)return;sessionStorage.setItem(key,String(n+1));var done=function(){var u=new URL(location.href);u.searchParams.set('b',b);location.replace(u.pathname+u.search+u.hash)};if(!window.caches){done();return}caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}).then(done,done)}).catch(function(){})}go();document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')go()})}());
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>הכסף שלי</title>
@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=24">
+<link rel="stylesheet" href="app.css?v=25">
 </head>
 <body>
 <a class="skip" href="#main">דילוג לתוכן</a>
@@ -557,17 +557,17 @@
 
 <div class="lock" id="lock" hidden role="dialog" aria-modal="true" aria-labelledby="lockT">
   <div class="lockin">
-    <div class="lockic"><svg class="ic"><use href="#i-lock"/></svg></div>
+    <div class="lockic" id="lockIc"><svg class="ic lockic-lock"><use href="#i-lock"/></svg><svg class="ic lockic-face" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M8 4H6a2 2 0 0 0-2 2v2M16 4h2a2 2 0 0 1 2 2v2M8 20H6a2 2 0 0 1-2-2v-2M16 20h2a2 2 0 0 0 2-2v-2"/><circle cx="9" cy="10" r=".8" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r=".8" fill="currentColor" stroke="none"/><path d="M9 15c.8.8 1.8 1.2 3 1.2s2.2-.4 3-1.2"/></svg></div>
     <h2 id="lockT">הכסף שלי נעול</h2>
-    <button class="btn solid" id="lockBio" hidden>פתח עם Face ID</button>
+    <p class="lockface" id="lockFace">Face ID</p>
     <form id="lockF" class="lockf"><input class="field" id="lockPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="קוד" aria-label="קוד הנעילה"><button class="btn" type="submit">פתח</button></form>
     <p class="err" id="lockErr"></p>
-    <button class="lnk2" id="lockForgot">שכחתי את הקוד</button>
+    <button class="lnk2" id="lockForgot" type="button">שכחתי את הקוד</button>
   </div>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"><span id="tmsg"></span><button id="tundo">בטל</button></div>
 
-<script src="app.js?v=40"></script>
+<script src="app.js?v=41"></script>
 </body>
 </html>
