@@ -10,7 +10,7 @@ var FOLDER = 'הכסף שלי - קבלות';
 var H = ['תאריך', 'סוג', 'סכום', 'קטגוריה', 'תיאור', 'קבלה', 'נמחק', 'id', 'catId', 'img', 'u', 's', 'הערה', 'תגיות', 'x'];
 var C = {d: 0, t: 1, a: 2, cn: 3, n: 4, rc: 5, del: 6, id: 7, c: 8, img: 9, u: 10, s: 11, note: 12, tags: 13, x: 14};
 var TECH = C.s - C.id + 1;
-var VERSION = 15;
+var VERSION = 16;
 var AUTO_ = function () { return typeof KESEF_AUTO !== 'undefined' && !!KESEF_AUTO; };
 var DEVS = 'מכשירים';
 var DH = ['dev', 'name', 'endpoint', 'pub', 'prefs', 'tokens', 'queue', 'updated'];
@@ -71,6 +71,7 @@ function doPost(e) {
     if (req.action === 'ing-token') return out_(ingToken_(req));
     if (req.action === 'ing-test') return out_(ingTest_(req));
     if (req.action === 'ib') return out_(ibSave_(req));
+    if (req.action === 'bn') return out_(bnSave_(req));
     return out_({ok: false, err: 'action'});
   } catch (err) {
     return out_({ok: false, err: 'server', msg: String(err && err.message || err)});
@@ -168,6 +169,116 @@ function ibSave_(req) {
   props.setProperty('IBQ', q);
   try { ibEnsure_(); } catch (e) {}
   return ibPull_();
+}
+
+/* שווי בינאנס. המפתח והסוד נשמרים רק בהגדרות הסקריפט, לא בגיליון. */
+function bnHex_(bytes) {
+  var s = '';
+  for (var i = 0; i < bytes.length; i++) {
+    var b = bytes[i];
+    if (b < 0) b += 256;
+    var h = b.toString(16);
+    s += h.length < 2 ? '0' + h : h;
+  }
+  return s;
+}
+function bnSnap_() {
+  try { var o = JSON.parse(PropertiesService.getScriptProperties().getProperty('BNNAV') || ''); } catch (e) { return null; }
+  if (!o || !isFinite(+o.v)) return null;
+  return {v: Math.round(+o.v * 100) / 100, ccy: 'USD', d: String(o.d || '').slice(0, 10), at: +o.at || 0, pct: isFinite(+o.pct) ? Math.round(+o.pct * 100) / 100 : null};
+}
+function bnGet_(path, key, secret) {
+  var qs = 'recvWindow=10000&timestamp=' + Date.now();
+  var sig = bnHex_(Utilities.computeHmacSha256Signature(qs, secret));
+  var res = UrlFetchApp.fetch('https://api.binance.com' + path + '?' + qs + '&signature=' + sig, {
+    muteHttpExceptions: true,
+    headers: {'X-MBX-APIKEY': key}
+  });
+  var body = res.getContentText() || '';
+  var json;
+  try { json = JSON.parse(body); } catch (e) { json = {msg: body.slice(0, 160)}; }
+  if (res.getResponseCode() !== 200) {
+    var err = new Error(String(json.msg || 'binance').slice(0, 180));
+    err.code = json.code;
+    throw err;
+  }
+  return json;
+}
+function bnUsd_() {
+  var rows = JSON.parse(UrlFetchApp.fetch('https://api.binance.com/api/v3/ticker/price', {muteHttpExceptions: true}).getContentText() || '[]');
+  var px = {};
+  for (var i = 0; i < rows.length; i++) px[rows[i].symbol] = parseFloat(rows[i].price);
+  return px;
+}
+function bnFromWallets_(key, secret, px) {
+  var rows = bnGet_('/sapi/v1/asset/wallet/balance', key, secret);
+  if (!rows || !rows.length) return null;
+  var btc = 0, n = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var b = parseFloat(rows[i].balance);
+    if (b > 0) { btc += b; n++; }
+  }
+  if (!(px.BTCUSDT > 0)) return null;
+  return {v: btc * px.BTCUSDT, n: n};
+}
+function bnFromSpot_(key, secret, px) {
+  var acct = bnGet_('/api/v3/account', key, secret);
+  var usd = 0, n = 0, stable = {USDT: 1, USDC: 1, FDUSD: 1, BUSD: 1, TUSD: 1, USD: 1};
+  var list = acct.balances || [];
+  for (var i = 0; i < list.length; i++) {
+    var q = (parseFloat(list[i].free) || 0) + (parseFloat(list[i].locked) || 0);
+    if (!(q > 0)) continue;
+    var a = String(list[i].asset || '');
+    var p = stable[a] ? 1 : (px[a + 'USDT'] || (px[a + 'USDC'] && px.USDCUSDT ? px[a + 'USDC'] * px.USDCUSDT : 0));
+    if (!(p > 0)) continue;
+    usd += q * p;
+    n++;
+  }
+  return {v: usd, n: n};
+}
+function bnEnsure_() {
+  var has = false, all = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < all.length; i++) if (all[i].getHandlerFunction() === 'bnDaily') has = true;
+  if (!has) ScriptApp.newTrigger('bnDaily').timeBased().everyDays(1).atHour(8).create();
+}
+function bnPull_() {
+  var props = PropertiesService.getScriptProperties();
+  var key = props.getProperty('BNKEY'), secret = props.getProperty('BNSEC');
+  if (!key || !secret) return {ok: false, err: 'bn_none'};
+  var px, got;
+  try {
+    px = bnUsd_();
+    try { got = bnFromWallets_(key, secret, px); } catch (e) { got = null; }
+    var spot = null;
+    try { if (!got || !(got.v > 0)) spot = bnFromSpot_(key, secret, px); } catch (e2) { if (!got) throw e2; }
+    if (spot && (!got || spot.v > got.v)) got = spot;
+  } catch (e) {
+    var m = String(e && e.message || e);
+    if (/-2015|IP|permissions/i.test(m)) return {ok: false, err: 'bn_ip', msg: 'בינאנס חסמה את המפתח. צריך מפתח בלי הגבלת IP, ורק עם Enable Reading.'};
+    return {ok: false, err: 'bn_api', msg: m.slice(0, 180)};
+  }
+  if (!got || !(got.v >= 0)) return {ok: false, err: 'bn_parse', msg: 'לא הצלחתי לחשב שווי.'};
+  var nav = {v: Math.round(got.v * 100) / 100, ccy: 'USD', d: Utilities.formatDate(new Date(), 'Asia/Jerusalem', 'yyyy-MM-dd'), at: Date.now()};
+  var prev = bnSnap_();
+  if (prev && prev.v && prev.d && prev.d !== nav.d) nav.pct = Math.round((nav.v - prev.v) / Math.abs(prev.v) * 10000) / 100;
+  props.setProperty('BNNAV', JSON.stringify(nav));
+  return {ok: true, v: VERSION, bn: nav};
+}
+function bnDaily() {
+  try { bnPull_(); } catch (e) {}
+}
+function bnSave_(req) {
+  var props = PropertiesService.getScriptProperties();
+  if (req.clear) {
+    props.deleteProperty('BNKEY'); props.deleteProperty('BNSEC'); props.deleteProperty('BNNAV');
+    return {ok: true, v: VERSION, bn: null};
+  }
+  var key = String(req.key || '').trim(), secret = String(req.secret || '').trim();
+  if (key.length < 16 || secret.length < 16) return {ok: false, err: 'bn_bad'};
+  props.setProperty('BNKEY', key);
+  props.setProperty('BNSEC', secret);
+  try { bnEnsure_(); } catch (e) {}
+  return bnPull_();
 }
 
 /* ---------- סוגי תנועות: הקטגוריה קובעת מה זה, הכיוון (סוג) קובע אם נכנס או יצא ----------
@@ -338,7 +449,7 @@ function sync_(req) {
     var curCfg = (req.cfg && (+req.cfg.u || 0) >= cu) ? req.cfg : JSON.parse(cv[0] || '{}');
     notify_(req, append, it.newMsgs, data, curCfg, tz, now);
   } catch (e) {}
-  return {ok: true, v: VERSION, now: now, tx: out, ids: req.full ? ids : undefined, cfg: cfg, ib: ibSnap_(),
+  return {ok: true, v: VERSION, now: now, tx: out, ids: req.full ? ids : undefined, cfg: cfg, ib: ibSnap_(), bn: bnSnap_(),
     items: it.items, itemIds: req.full ? it.ids : undefined, sheet: SpreadsheetApp.getActive().getUrl()};
 }
 

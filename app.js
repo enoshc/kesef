@@ -115,6 +115,7 @@ function load(){
   try{const u=JSON.parse(localStorage.getItem(LSU)||'null');if(u){if(u.mode==='list'||u.mode==='grid')ui.mode=u.mode;ui.me=String(u.me||'').slice(0,40);ui.dev=String(u.dev||'');ui.read=+u.read||0;if(u.ss)ui.ss={int:clamp(+u.ss.int||8,3,120),idle:clamp(+u.ss.idle||0,0,60),info:u.ss.info!==false};if(u.push&&typeof u.push==='object')ui.push={on:!!u.push.on,cov:+u.push.cov||0,prefs:{tx:u.push.prefs?.tx!==false,msg:u.push.prefs?.msg!==false,budget:u.push.prefs?.budget!==false,rec:u.push.prefs?.rec!==false,bank:u.push.prefs?.bank!==false}};if(u.bg)ui.bg={mode:['hero','app','off'].includes(u.bg.mode)?u.bg.mode:'hero',int:clamp(+u.bg.int||10,3,300)}}}catch{}
   if(!/^[a-z0-9]{8,}$/.test(ui.dev))ui.dev=rid(10);
   try{const ib=JSON.parse(localStorage.getItem('kesef-ib')||'null');if(ib&&isFinite(+ib.v))S.ib=normIb(ib)}catch{}
+  try{const bn=JSON.parse(localStorage.getItem('kesef-bn')||'null');if(bn&&isFinite(+bn.v))S.bn=normIb(bn)}catch{}
 }
 let saveT=null,storageOk=true;
 function persist(){clearTimeout(saveT);saveT=setTimeout(persistNow,150)}
@@ -319,6 +320,7 @@ function applyRemote(res,full){
     S.su=+res.cfg.u;changed=true;
   }
   if(res.ib){const ib=normIb(res.ib);if(ib&&JSON.stringify(ib)!==JSON.stringify(S.ib||null)){S.ib=ib;try{localStorage.setItem('kesef-ib',JSON.stringify(ib))}catch{}changed=true}}
+  if(res.bn){const bn=normIb(res.bn);if(bn&&JSON.stringify(bn)!==JSON.stringify(S.bn||null)){S.bn=bn;try{localStorage.setItem('kesef-bn',JSON.stringify(bn))}catch{}changed=true}}
   (res.tx||[]).forEach(r=>{
     if(!r||!r.id)return;
     const i=S.tx.findIndex(x=>x.id===r.id),loc=S.tx[i];
@@ -1793,6 +1795,9 @@ function renderBank(){
   b.innerHTML=`<div class="card"><h2>תיק אינטראקטיב</h2>
 ${S.ib?`<p class="fcbig">${esc(fmtIb(S.ib))}</p>${isFinite(S.ib.pct)?`<p class="hint">${S.ib.pct>0?'עלייה':S.ib.pct<0?'ירידה':'בלי שינוי'} של ${esc(fmtPct(S.ib.pct))} מול הדוח הקודם.</p>`:''}<p class="hint">שווי סגירה${S.ib.d?` של ${esc(dd(S.ib.d))}`:''}. מתעדכן כל בוקר מהדוח, לא בזמן אמת, ולא כולל את תיק ההשקעות של פפר.</p>`:'<p class="hint">עוד לא מחובר. בהגדרות, תחת אינטראקטיב, מדביקים מפתח קריאה ומספר שאילתה. משם השווי יורד כל בוקר.</p>'}
 <p class="hint" style="margin:12px 0 0"><a href="#settings" data-sopen="s-ib">הגדרות החיבור</a></p></div>
+<div class="card"><h2>בינאנס</h2>
+${S.bn?`<p class="fcbig">${esc(fmtIb(S.bn))}</p>${isFinite(S.bn.pct)?`<p class="hint">${S.bn.pct>0?'עלייה':S.bn.pct<0?'ירידה':'בלי שינוי'} של ${esc(fmtPct(S.bn.pct))} מול הדוח הקודם.</p>`:''}<p class="hint">שווי בזמן המשיכה${S.bn.d?`, ${esc(dd(S.bn.d))}`:''}. מתעדכן כל בוקר. לא כולל את אינטראקטיב ולא את פפר.</p>`:'<p class="hint">עוד לא מחובר. בהגדרות, תחת בינאנס, מדביקים מפתח לקריאה בלבד.</p>'}
+<p class="hint" style="margin:12px 0 0"><a href="#settings" data-sopen="s-bn">הגדרות החיבור</a></p></div>
 <div class="card"><h2>יתרה בבנק</h2>
 ${now?`<p class="fcbig">${esc(fmt(now.v))}</p><p class="hint">יתרה מחושבת להיום: נקודת ההתחלה מ־${esc(ddm(ex.bal.d))} (${esc(fmt(ex.bal.v))}), ועוד ${now.n} תנועות בבנק וחיובי כרטיס שירדו מאז.${now.un?` ${now.un} תנועות שהוזנו ידנית בלי לציין מאיזה חשבון לא נכללו.`:''}</p>`:'<p class="hint">כדי לבדוק שלא חסרות או כפולות תנועות, הזן את היתרה שמופיעה עכשיו באפליקציית הבנק. בפעם הראשונה זו נקודת ההתחלה. ייבוא של קובץ עו"ש מ־Pepper קובע אותה לבד.</p>'}
 <label class="lbl" for="balIn">היתרה עכשיו באפליקציית הבנק</label>
@@ -1850,6 +1855,31 @@ ACT['ib-save']=async btn=>{
     }
     if(r.ib){S.ib=normIb(r.ib);try{localStorage.setItem('kesef-ib',JSON.stringify(S.ib))}catch{}}
     $('#ibTok').value='';toast(S.ib?`התיק עודכן: ${fmtIb(S.ib)}. מעכשיו כל בוקר.`:'החיבור נשמר');render();
+  }catch(e){er.textContent=errText(e)}
+  finally{btn.disabled=false}
+};
+function renderSetBn(){const el=$('#setBn');if(!el)return;const bn=S.bn;
+  el.innerHTML=`<p class="hint">בבינאנס: More, ואז API Management, Create API, System generated. שם: kesef. מסמנים רק Enable Reading. בלי מסחר, בלי משיכה, ובלי הגבלת IP. מעתיקים את ה-API Key ואת ה-Secret. הם לא נשמרים בטלפון.</p>
+${bn?`<p class="hint">עודכן לאחרונה: <b>${esc(fmtIb(bn))}</b>${bn.d?` · ${esc(dd(bn.d))}`:''}.</p>`:''}
+<label class="lbl" for="bnKey">API Key</label>
+<input class="field" id="bnKey" type="password" autocomplete="off" placeholder="המפתח">
+<label class="lbl" for="bnSec">Secret</label>
+<input class="field" id="bnSec" type="password" autocomplete="off" placeholder="הסוד, מוצג פעם אחת">
+<div class="btnrow"><button class="btn solid sm" data-act="bn-save">חבר ועדכן עכשיו</button></div>
+<p class="hint" id="bnErr" style="margin:8px 0 0"></p>`}
+ACT['bn-save']=async btn=>{
+  if(!SY.on){toast('קודם מחברים את הגיליון, בהגדרות');return}
+  const key=$('#bnKey').value.trim(),secret=$('#bnSec').value.trim(),er=$('#bnErr');
+  er.textContent='';btn.disabled=true;
+  try{
+    const r=await Sync.call({action:'bn',key,secret});
+    if(!r||!r.ok){
+      const m=r&&r.err;
+      er.textContent=m==='action'?'הסקריפט בגיליון ישן. במסך הסנכרון לוחצים «משוך עכשיו את הגרסה האחרונה».' :m==='bn_bad'?'צריך גם API Key וגם Secret.':(r&&r.msg)||'בינאנס לא החזירה שווי.';
+      return;
+    }
+    if(r.bn){S.bn=normIb(r.bn);try{localStorage.setItem('kesef-bn',JSON.stringify(S.bn))}catch{}}
+    $('#bnKey').value='';$('#bnSec').value='';toast(S.bn?`בינאנס עודכן: ${fmtIb(S.bn)}. מעכשיו כל בוקר.`:'החיבור נשמר');render();
   }catch(e){er.textContent=errText(e)}
   finally{btn.disabled=false}
 };
@@ -2026,7 +2056,7 @@ function renderSetDyn(){const keep={},ae=document.activeElement,aid=ae?.id;['wEm
   const F={push:pushCard,mail:weeklyCard,auto:autoCard,siri:siriCard,widget:widgetCard};
   $$('[data-sdyn]').forEach(el=>{el.innerHTML=!SY.on?NOSYNC:SY.ro?'<p class="hint" style="margin:0">לא זמין בחשבון לצפייה בלבד.</p>':cardBody(F[el.dataset.sdyn]())});
   Object.keys(keep).forEach(id=>{const el=$('#'+id);if(el){if(el.type==='checkbox')el.checked=keep[id];else el.value=keep[id]}});if(aid)$('#'+aid)?.focus({preventScroll:true})}
-function renderSettings(){$('#pName').value=S.profile.name;$('#pMe').value=ui.me;renderBudget();renderSetBank();renderSetIb();renderLockCard();renderSetDyn()}
+function renderSettings(){$('#pName').value=S.profile.name;$('#pMe').value=ui.me;renderBudget();renderSetBank();renderSetIb();renderSetBn();renderLockCard();renderSetDyn()}
 document.addEventListener('click',e=>{const a=e.target.closest('[data-sopen]');if(!a)return;const id=a.dataset.sopen;setTimeout(()=>{const d=$('#'+id);if(d){d.open=true;d.scrollIntoView({block:'start'})}},60)});
 
 /* ---------- app lock: Face ID / Touch ID + code, per device ---------- */
